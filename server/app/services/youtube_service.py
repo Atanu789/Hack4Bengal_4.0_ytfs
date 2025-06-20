@@ -8,7 +8,11 @@ from dotenv import load_dotenv
 import requests
 from pymongo import MongoClient
 from youtube_transcript_api import YouTubeTranscriptApi
-from youtube_transcript_api._errors import TranscriptsDisabled, NoTranscriptFound, VideoUnavailable
+from youtube_transcript_api._errors import (
+    TranscriptsDisabled,
+    NoTranscriptFound,
+    VideoUnavailable,
+)
 from .embedding_service import EmbeddingService
 from aiolimiter import AsyncLimiter
 import os
@@ -29,34 +33,34 @@ ATLAS_VECTOR_SEARCH_INDEX_NAME = os.getenv("ATLAS_VECTOR_SEARCH_INDEX_NAME")
 
 class MongoDBEmbeddingSaver:
     def __init__(self):
-        
-        
+
         if not MONGODB_ATLAS_CLUSTER_URI:
             raise ValueError("MONGODB_URI environment variable is required")
-        
-        
+
         self.client = MongoClient(MONGODB_ATLAS_CLUSTER_URI)
         self.db = self.client[DB_NAME]
         self.collection = self.db[COLLECTION_NAME]
-        
+
         # Initialize embedding service
         self.embedding_service = EmbeddingService()
-        
+
         # Initialize vector store
         self.vector_store = MongoDBAtlasVectorSearch(
             collection=self.collection,
             embedding=self.embedding_service,
             index_name=ATLAS_VECTOR_SEARCH_INDEX_NAME,
-            relevance_score_fn="cosine"
+            relevance_score_fn="cosine",
         )
-        
+
         print("MongoDB Vector Store initialized successfully!")
-    
-    async def save_video_embeddings(self, processed_video: 'ProcessedVideo') -> Dict[str, any]:
+
+    async def save_video_embeddings(
+        self, processed_video: "ProcessedVideo"
+    ) -> Dict[str, any]:
         """Save all video embeddings to MongoDB"""
         try:
             saved_documents = []
-            
+
             # Save video metadata document
             metadata_doc = {
                 "video_id": processed_video.video_info.video_id,
@@ -74,17 +78,19 @@ class MongoDBEmbeddingSaver:
                 "embedding": processed_video.metadata_embedding,
                 "created_at": datetime.utcnow(),
                 "full_text": processed_video.captions_text,
-                "total_segments": len(processed_video.caption_segments)
+                "total_segments": len(processed_video.caption_segments),
             }
-            
+
             # Insert metadata document
             metadata_result = self.collection.insert_one(metadata_doc)
-            saved_documents.append({
-                "type": "metadata",
-                "id": str(metadata_result.inserted_id),
-                "video_id": processed_video.video_info.video_id
-            })
-            
+            saved_documents.append(
+                {
+                    "type": "metadata",
+                    "id": str(metadata_result.inserted_id),
+                    "video_id": processed_video.video_info.video_id,
+                }
+            )
+
             # Save full text embedding document
             if processed_video.full_text_embedding:
                 full_text_doc = {
@@ -96,16 +102,18 @@ class MongoDBEmbeddingSaver:
                     "embedding": processed_video.full_text_embedding,
                     "created_at": datetime.utcnow(),
                     "character_count": len(processed_video.captions_text),
-                    "segment_count": len(processed_video.caption_segments)
+                    "segment_count": len(processed_video.caption_segments),
                 }
-                
+
                 full_text_result = self.collection.insert_one(full_text_doc)
-                saved_documents.append({
-                    "type": "full_text",
-                    "id": str(full_text_result.inserted_id),
-                    "video_id": processed_video.video_info.video_id
-                })
-            
+                saved_documents.append(
+                    {
+                        "type": "full_text",
+                        "id": str(full_text_result.inserted_id),
+                        "video_id": processed_video.video_info.video_id,
+                    }
+                )
+
             # Save individual caption segments
             if processed_video.caption_segments:
                 segment_docs = []
@@ -124,39 +132,42 @@ class MongoDBEmbeddingSaver:
                         "formatted_end": segment.formatted_end,
                         "embedding": segment.embedding,
                         "created_at": datetime.utcnow(),
-                        "character_count": len(segment.text)
+                        "character_count": len(segment.text),
                     }
                     segment_docs.append(segment_doc)
-                
+
                 # Bulk insert segments for efficiency
                 if segment_docs:
                     segments_result = self.collection.insert_many(segment_docs)
                     for idx, inserted_id in enumerate(segments_result.inserted_ids):
-                        saved_documents.append({
-                            "type": "caption_segment",
-                            "id": str(inserted_id),
-                            "video_id": processed_video.video_info.video_id,
-                            "segment_index": idx
-                        })
-            
+                        saved_documents.append(
+                            {
+                                "type": "caption_segment",
+                                "id": str(inserted_id),
+                                "video_id": processed_video.video_info.video_id,
+                                "segment_index": idx,
+                            }
+                        )
+
             return {
                 "success": True,
                 "saved_documents": saved_documents,
                 "total_documents": len(saved_documents),
                 "metadata_saved": True,
+                "embedding": processed_video.metadata_embedding,
                 "full_text_saved": bool(processed_video.full_text_embedding),
-                "segments_saved": len(processed_video.caption_segments)
+                "segments_saved": len(processed_video.caption_segments),
             }
-            
+
         except Exception as e:
             logger.error(f"Error saving embeddings to MongoDB: {e}")
             return {
                 "success": False,
                 "error": str(e),
-                "saved_documents": saved_documents
+                "saved_documents": saved_documents,
             }
-    
-    def _create_metadata_text(self, video_info: 'VideoInfo') -> str:
+
+    def _create_metadata_text(self, video_info: "VideoInfo") -> str:
         """Create searchable text from video metadata"""
         metadata_parts = [
             f"Title: {video_info.title}",
@@ -164,41 +175,48 @@ class MongoDBEmbeddingSaver:
             f"Description: {video_info.description}" if video_info.description else "",
             f"Duration: {video_info.duration} seconds" if video_info.duration else "",
             f"View count: {video_info.view_count}" if video_info.view_count else "",
-            f"Publish date: {video_info.publish_date}" if video_info.publish_date else "",
+            (
+                f"Publish date: {video_info.publish_date}"
+                if video_info.publish_date
+                else ""
+            ),
             f"Tags: {', '.join(video_info.tags)}" if video_info.tags else "",
-            f"Category: {video_info.category}" if video_info.category else ""
+            f"Category: {video_info.category}" if video_info.category else "",
         ]
         return " | ".join([part for part in metadata_parts if part])
-    
-    async def search_similar_content(self, query_text: str, limit: int = 5) -> List[Dict]:
+
+    async def search_similar_content(
+        self, query_text: str, limit: int = 5
+    ) -> List[Dict]:
         """Search for similar content using vector search"""
         try:
             # Generate embedding for query
+            print(f"Generating embedding for query: {query_text}")
             query_embedding = await asyncio.to_thread(
-                self.embedding_service.get_document_embedding, query_text
-            )
-            
+            self.embedding_service.get_query_embedding, query_text
+        )
+            print(f"Query embedding generated: {query_embedding[:3]}...")
             # Perform vector search
             results = self.vector_store.similarity_search_with_score(
-                query_text, k=limit
-            )
-            
+            query_embedding, k=limit
+        )
+
             return [
-                {
-                    "content": doc.page_content,
-                    "metadata": doc.metadata,
-                    "similarity_score": score
-                }
-                for doc, score in results
-            ]
-            
+            {
+                "content": doc.page_content,
+                "metadata": doc.metadata,
+                "similarity_score": score,
+            }
+            for doc, score in results
+        ]
+
         except Exception as e:
             logger.error(f"Error performing vector search: {e}")
             return []
-    
+
     def close(self):
         """Close MongoDB connection"""
-        if hasattr(self, 'client'):
+        if hasattr(self, "client"):
             self.client.close()
 
 
@@ -226,6 +244,7 @@ class CaptionTrack:
 @dataclass
 class VideoInfo:
     """Contains comprehensive video information"""
+
     video_id: str
     title: str
     description: str
@@ -243,6 +262,7 @@ class VideoInfo:
 @dataclass
 class CaptionSegment:
     """Represents a caption segment with timing and embedding"""
+
     text: str
     start_time: float
     end_time: float
@@ -267,20 +287,58 @@ class YouTubeVideoService:
         self.session = requests.Session()
         self.limiter = AsyncLimiter(max_rate=2, time_period=1)
         self.embedding_service = EmbeddingService()
-        self.semaphore = asyncio.Semaphore(max_concurrent_embeddings)  # Fixed: Added semaphore
+        self.semaphore = asyncio.Semaphore(
+            max_concurrent_embeddings
+        )  # Fixed: Added semaphore
         self.mongo_saver = MongoDBEmbeddingSaver()
         self.common_languages = [
-            'en', 'es', 'fr', 'de', 'it', 'pt', 'ru', 'ja', 'ko', 'zh', 'zh-CN', 'zh-TW',
-            'ar', 'hi', 'hi-IN', 'th', 'vi', 'id', 'ms', 'tl', 'sv', 'no', 'da', 'fi', 'nl', 'pl',
-            'tr', 'cs', 'hu', 'ro', 'bg', 'hr', 'sk', 'sl', 'et', 'lv', 'lt', 'uk', 'he'
+            "en",
+            "es",
+            "fr",
+            "de",
+            "it",
+            "pt",
+            "ru",
+            "ja",
+            "ko",
+            "zh",
+            "zh-CN",
+            "zh-TW",
+            "ar",
+            "hi",
+            "hi-IN",
+            "th",
+            "vi",
+            "id",
+            "ms",
+            "tl",
+            "sv",
+            "no",
+            "da",
+            "fi",
+            "nl",
+            "pl",
+            "tr",
+            "cs",
+            "hu",
+            "ro",
+            "bg",
+            "hr",
+            "sk",
+            "sl",
+            "et",
+            "lv",
+            "lt",
+            "uk",
+            "he",
         ]
 
     def extract_video_id(self, url: str) -> Optional[str]:
         patterns = [
-            r'(?:youtube\.com\/watch\?v=|youtu\.be\/|youtube\.com\/embed\/)([^&\n?#]+)',
-            r'youtube\.com\/v\/([^&\n?#]+)',
-            r'youtube\.com\/watch\?.*v=([^&\n?#]+)',
-            r'(?:youtube\.com\/shorts\/)([^&\n?#]+)'
+            r"(?:youtube\.com\/watch\?v=|youtu\.be\/|youtube\.com\/embed\/)([^&\n?#]+)",
+            r"youtube\.com\/v\/([^&\n?#]+)",
+            r"youtube\.com\/watch\?.*v=([^&\n?#]+)",
+            r"(?:youtube\.com\/shorts\/)([^&\n?#]+)",
         ]
 
         for pattern in patterns:
@@ -299,11 +357,16 @@ class YouTubeVideoService:
             response.raise_for_status()
 
             data = response.json()
-            metadata.update({
-                'title': data.get('title', f'Video {video_id}'),
-                'author': data.get('author_name', 'Unknown Author'),
-                'thumbnail_url': data.get('thumbnail_url', f'https://img.youtube.com/vi/{video_id}/maxresdefault.jpg'),
-            })
+            metadata.update(
+                {
+                    "title": data.get("title", f"Video {video_id}"),
+                    "author": data.get("author_name", "Unknown Author"),
+                    "thumbnail_url": data.get(
+                        "thumbnail_url",
+                        f"https://img.youtube.com/vi/{video_id}/maxresdefault.jpg",
+                    ),
+                }
+            )
         except Exception as e:
             logger.warning(f"oEmbed API failed: {e}")
 
@@ -317,51 +380,57 @@ class YouTubeVideoService:
 
                 # Extract additional metadata from HTML using regex
                 title_match = re.search(r'"title":"([^"]+)"', html_content)
-                if title_match and 'title' not in metadata:
-                    metadata['title'] = title_match.group(1).encode().decode('unicode_escape')
+                if title_match and "title" not in metadata:
+                    metadata["title"] = (
+                        title_match.group(1).encode().decode("unicode_escape")
+                    )
 
                 # Extract view count
                 view_match = re.search(r'"viewCount":"(\d+)"', html_content)
                 if view_match:
-                    metadata['view_count'] = int(view_match.group(1))
+                    metadata["view_count"] = int(view_match.group(1))
 
                 # Extract duration
                 duration_match = re.search(r'"lengthSeconds":"(\d+)"', html_content)
                 if duration_match:
-                    metadata['duration'] = int(duration_match.group(1))
+                    metadata["duration"] = int(duration_match.group(1))
 
                 # Extract description
                 desc_match = re.search(r'"shortDescription":"([^"]*)"', html_content)
                 if desc_match:
-                    metadata['description'] = desc_match.group(1).encode().decode('unicode_escape')
+                    metadata["description"] = (
+                        desc_match.group(1).encode().decode("unicode_escape")
+                    )
 
                 # Extract upload date
                 date_match = re.search(r'"uploadDate":"([^"]+)"', html_content)
                 if date_match:
-                    metadata['publish_date'] = date_match.group(1)
+                    metadata["publish_date"] = date_match.group(1)
 
                 # Extract tags
                 tags_match = re.search(r'"keywords":\[([^\]]+)\]', html_content)
                 if tags_match:
                     try:
-                        tags_str = '[' + tags_match.group(1) + ']'
-                        metadata['tags'] = json.loads(tags_str)
+                        tags_str = "[" + tags_match.group(1) + "]"
+                        metadata["tags"] = json.loads(tags_str)
                     except:
-                        metadata['tags'] = []
+                        metadata["tags"] = []
 
         except Exception as e:
             logger.warning(f"Failed to extract additional metadata: {e}")
 
         # Fill in defaults for missing fields
-        metadata.setdefault('title', f'Video {video_id}')
-        metadata.setdefault('author', 'Unknown Author')
-        metadata.setdefault('description', '')
-        metadata.setdefault('duration', None)
-        metadata.setdefault('view_count', None)
-        metadata.setdefault('publish_date', None)
-        metadata.setdefault('thumbnail_url', f'https://img.youtube.com/vi/{video_id}/maxresdefault.jpg')
-        metadata.setdefault('tags', [])
-        metadata.setdefault('category', None)
+        metadata.setdefault("title", f"Video {video_id}")
+        metadata.setdefault("author", "Unknown Author")
+        metadata.setdefault("description", "")
+        metadata.setdefault("duration", None)
+        metadata.setdefault("view_count", None)
+        metadata.setdefault("publish_date", None)
+        metadata.setdefault(
+            "thumbnail_url", f"https://img.youtube.com/vi/{video_id}/maxresdefault.jpg"
+        )
+        metadata.setdefault("tags", [])
+        metadata.setdefault("category", None)
 
         return metadata
 
@@ -373,12 +442,14 @@ class YouTubeVideoService:
             transcript_list = YouTubeTranscriptApi.list_transcripts(video_id)
 
             for transcript in transcript_list:
-                caption_tracks.append(CaptionTrack(
-                    language_code=transcript.language_code,
-                    language_name=transcript.language,
-                    is_auto_generated=transcript.is_generated,
-                    is_translatable=transcript.is_translatable
-                ))
+                caption_tracks.append(
+                    CaptionTrack(
+                        language_code=transcript.language_code,
+                        language_name=transcript.language,
+                        is_auto_generated=transcript.is_generated,
+                        is_translatable=transcript.is_translatable,
+                    )
+                )
 
         except (TranscriptsDisabled, NoTranscriptFound, VideoUnavailable) as e:
             logger.info(f"No captions available for video {video_id}: {e}")
@@ -405,7 +476,7 @@ class YouTubeVideoService:
             # Handle exceptions from concurrent tasks
             if isinstance(metadata, Exception):
                 logger.error(f"Failed to get metadata: {metadata}")
-                metadata = {'title': f'Video {video_id}', 'author': 'Unknown'}
+                metadata = {"title": f"Video {video_id}", "author": "Unknown"}
 
             if isinstance(available_captions, Exception):
                 logger.error(f"Failed to get captions list: {available_captions}")
@@ -413,17 +484,17 @@ class YouTubeVideoService:
 
             return VideoInfo(
                 video_id=video_id,
-                title=metadata['title'],
-                description=metadata['description'],
-                duration=metadata['duration'],
-                view_count=metadata['view_count'],
-                author=metadata['author'],
-                publish_date=metadata['publish_date'],
-                thumbnail_url=metadata['thumbnail_url'],
+                title=metadata["title"],
+                description=metadata["description"],
+                duration=metadata["duration"],
+                view_count=metadata["view_count"],
+                author=metadata["author"],
+                publish_date=metadata["publish_date"],
+                thumbnail_url=metadata["thumbnail_url"],
                 formats=[],  # We're removing pytube, so no download formats
                 available_captions=available_captions,
-                tags=metadata['tags'],
-                category=metadata['category']
+                tags=metadata["tags"],
+                category=metadata["category"],
             )
 
         except Exception as e:
@@ -431,12 +502,12 @@ class YouTubeVideoService:
             raise
 
     async def get_captions(
-            self,
-            url: str,
-            languages: Optional[List[str]] = None,
-            prefer_manual: bool = True,
-            format_type: str = "json",
-            translate_to: Optional[str] = None
+        self,
+        url: str,
+        languages: Optional[List[str]] = None,
+        prefer_manual: bool = True,
+        format_type: str = "json",
+        translate_to: Optional[str] = None,
     ) -> Dict[str, any]:
 
         try:
@@ -449,16 +520,13 @@ class YouTubeVideoService:
             except (TranscriptsDisabled, VideoUnavailable):
                 return {
                     "success": False,
-                    "error": "Captions are disabled or video is unavailable for this video"
+                    "error": "Captions are disabled or video is unavailable for this video",
                 }
             except NoTranscriptFound:
-                return {
-                    "success": False,
-                    "error": "No captions found for this video"
-                }
+                return {"success": False, "error": "No captions found for this video"}
 
             if not languages:
-                languages = ['en']
+                languages = ["en"]
             selected_transcript = None
             selected_language = None
 
@@ -466,12 +534,16 @@ class YouTubeVideoService:
                 try:
                     if prefer_manual:
                         try:
-                            selected_transcript = transcript_list.find_manually_created_transcript([lang])
+                            selected_transcript = (
+                                transcript_list.find_manually_created_transcript([lang])
+                            )
                             selected_language = lang
                             break
                         except NoTranscriptFound:
                             try:
-                                selected_transcript = transcript_list.find_generated_transcript([lang])
+                                selected_transcript = (
+                                    transcript_list.find_generated_transcript([lang])
+                                )
                                 selected_language = lang
                                 break
                             except NoTranscriptFound:
@@ -486,7 +558,9 @@ class YouTubeVideoService:
             if not selected_transcript:
                 available_transcripts = list(transcript_list)
                 if available_transcripts:
-                    manual_transcripts = [t for t in available_transcripts if not t.is_generated]
+                    manual_transcripts = [
+                        t for t in available_transcripts if not t.is_generated
+                    ]
                     if manual_transcripts and prefer_manual:
                         selected_transcript = manual_transcripts[0]
                     else:
@@ -496,7 +570,7 @@ class YouTubeVideoService:
             if not selected_transcript:
                 return {
                     "success": False,
-                    "error": "No suitable captions found for the requested languages"
+                    "error": "No suitable captions found for the requested languages",
                 }
 
             if translate_to and translate_to != selected_language:
@@ -511,17 +585,27 @@ class YouTubeVideoService:
             except Exception as e:
                 return {
                     "success": False,
-                    "error": f"Failed to fetch caption data: {str(e)}"
+                    "error": f"Failed to fetch caption data: {str(e)}",
                 }
 
             formatted_captions = []
             for item in transcript_data:
                 caption_dict = {
-                    'text': item.get('text', '') if isinstance(item, dict) else getattr(item, 'text', ''),
-                    'start': float(item.get('start', 0.0)) if isinstance(item, dict) else float(
-                        getattr(item, 'start', 0.0)),
-                    'duration': float(item.get('duration', 0.0)) if isinstance(item, dict) else float(
-                        getattr(item, 'duration', 0.0))
+                    "text": (
+                        item.get("text", "")
+                        if isinstance(item, dict)
+                        else getattr(item, "text", "")
+                    ),
+                    "start": (
+                        float(item.get("start", 0.0))
+                        if isinstance(item, dict)
+                        else float(getattr(item, "start", 0.0))
+                    ),
+                    "duration": (
+                        float(item.get("duration", 0.0))
+                        if isinstance(item, dict)
+                        else float(getattr(item, "duration", 0.0))
+                    ),
                 }
                 formatted_captions.append(caption_dict)
 
@@ -529,7 +613,11 @@ class YouTubeVideoService:
             if format_type != "json":
                 formatted_text = self._format_captions(formatted_captions, format_type)
 
-            total_duration = max([c['start'] + c['duration'] for c in formatted_captions]) if formatted_captions else 0
+            total_duration = (
+                max([c["start"] + c["duration"] for c in formatted_captions])
+                if formatted_captions
+                else 0
+            )
 
             return {
                 "success": True,
@@ -542,22 +630,20 @@ class YouTubeVideoService:
                 "duration": total_duration,
                 "subtitles": formatted_captions if format_type == "json" else None,
                 "text": formatted_text if format_type != "json" else None,
-                "was_translated": translate_to is not None and translate_to != selected_transcript.language_code
+                "was_translated": translate_to is not None
+                and translate_to != selected_transcript.language_code,
             }
 
         except Exception as e:
             logger.error(f"Error getting captions: {e}")
-            return {
-                "success": False,
-                "error": str(e)
-            }
+            return {"success": False, "error": str(e)}
 
     async def process_video_with_embeddings(
-            self,
-            url: str,
-            languages: Optional[List[str]] = None,
-            embed_individual_segments: bool = True,
-            save_to_db: bool = True
+        self,
+        url: str,
+        languages: Optional[List[str]] = None,
+        embed_individual_segments: bool = True,
+        save_to_db: bool = True,
     ) -> Tuple[ProcessedVideo, Optional[Dict]]:
         try:
             video_info = await self.get_video_info(url)
@@ -566,7 +652,7 @@ class YouTubeVideoService:
             captions_result, vtt_result, txt_result = await asyncio.gather(
                 self.get_captions(url, languages=languages, format_type="json"),
                 self.get_captions(url, languages=languages, format_type="vtt"),
-                self.get_captions(url, languages=languages, format_type="txt")
+                self.get_captions(url, languages=languages, format_type="txt"),
             )
 
             if not captions_result["success"]:
@@ -580,7 +666,9 @@ class YouTubeVideoService:
             caption_segments = []
 
             if embed_individual_segments and subtitle_segments:
-                print(f"Generating embeddings for {len(subtitle_segments)} caption segments...")
+                print(
+                    f"Generating embeddings for {len(subtitle_segments)} caption segments..."
+                )
 
                 async def process_segment(segment):
                     text = segment.get("text", "").strip()
@@ -591,7 +679,7 @@ class YouTubeVideoService:
                         duration = segment.get("duration", 0.0)
                         end_time = start_time + duration
 
-                        async with self.semaphore:  
+                        async with self.semaphore:
                             embedding = await asyncio.to_thread(
                                 self.embedding_service.get_document_embedding, text
                             )
@@ -603,7 +691,7 @@ class YouTubeVideoService:
                             duration=duration,
                             embedding=embedding,
                             formatted_start=self._seconds_to_vtt_time(start_time),
-                            formatted_end=self._seconds_to_vtt_time(end_time)
+                            formatted_end=self._seconds_to_vtt_time(end_time),
                         )
                     except Exception as e:
                         logger.warning(f"Failed to embed segment '{text[:50]}...': {e}")
@@ -642,16 +730,20 @@ class YouTubeVideoService:
                 captions_vtt=captions_vtt,
                 caption_segments=caption_segments,
                 metadata_embedding=metadata_embedding,
-                full_text_embedding=full_text_embedding
+                full_text_embedding=full_text_embedding,
             )
 
             # Save to MongoDB if requested
             save_result = None
             if save_to_db:
                 print("Saving embeddings to MongoDB...")
-                save_result = await self.mongo_saver.save_video_embeddings(processed_video)
+                save_result = await self.mongo_saver.save_video_embeddings(
+                    processed_video
+                )
                 if save_result["success"]:
-                    print(f"✅ Successfully saved {save_result['total_documents']} documents to MongoDB")
+                    print(
+                        f"✅ Successfully saved {save_result['total_documents']} documents to MongoDB"
+                    )
                 else:
                     print(f"❌ Failed to save to MongoDB: {save_result.get('error')}")
 
@@ -668,13 +760,19 @@ class YouTubeVideoService:
             f"Description: {video_info.description}" if video_info.description else "",
             f"Duration: {video_info.duration} seconds" if video_info.duration else "",
             f"View count: {video_info.view_count}" if video_info.view_count else "",
-            f"Publish date: {video_info.publish_date}" if video_info.publish_date else "",
+            (
+                f"Publish date: {video_info.publish_date}"
+                if video_info.publish_date
+                else ""
+            ),
             f"Tags: {', '.join(video_info.tags)}" if video_info.tags else "",
-            f"Category: {video_info.category}" if video_info.category else ""
+            f"Category: {video_info.category}" if video_info.category else "",
         ]
         return " | ".join([part for part in metadata_parts if part])
 
-    def display_embeddings_with_timestamps(self, processed_video: ProcessedVideo, max_segments: int = 10):
+    def display_embeddings_with_timestamps(
+        self, processed_video: ProcessedVideo, max_segments: int = 10
+    ):
         print(f"\n🕒 TIMESTAMPED EMBEDDINGS")
         print("=" * 80)
 
@@ -684,13 +782,18 @@ class YouTubeVideoService:
 
         segments_to_show = min(max_segments, len(processed_video.caption_segments))
 
-        for i, segment in enumerate(processed_video.caption_segments[:segments_to_show]):
+        for i, segment in enumerate(
+            processed_video.caption_segments[:segments_to_show]
+        ):
             print(f"\n📍 Segment {i + 1}:")
             print(f"   ⏰ Time: {segment.formatted_start} --> {segment.formatted_end}")
             print(f"   ⏱️  Duration: {segment.duration:.2f}s")
-            print(f"   📝 Text: \"{segment.text[:100]}{'...' if len(segment.text) > 100 else ''}\"")
             print(
-                f"   🧠 Embedding: [{segment.embedding[0]:.6f}, {segment.embedding[1]:.6f}, {segment.embedding[2]:.6f}, ..., {segment.embedding[-1]:.6f}]")
+                f"   📝 Text: \"{segment.text[:100]}{'...' if len(segment.text) > 100 else ''}\""
+            )
+            print(
+                f"   🧠 Embedding: [{segment.embedding[0]:.6f}, {segment.embedding[1]:.6f}, {segment.embedding[2]:.6f}, ..., {segment.embedding[-1]:.6f}]"
+            )
             print(f"   📊 Dimensions: {len(segment.embedding)}")
             print("-" * 60)
 
@@ -701,15 +804,42 @@ class YouTubeVideoService:
         print(f"\n📈 SUMMARY:")
         print(f"   Total segments: {len(processed_video.caption_segments)}")
         print(
-            f"   Embedding dimensions: {len(processed_video.caption_segments[0].embedding) if processed_video.caption_segments else 0}")
+            f"   Embedding dimensions: {len(processed_video.caption_segments[0].embedding) if processed_video.caption_segments else 0}"
+        )
 
         if processed_video.full_text_embedding:
-            print(f"   Full text embedding dimensions: {len(processed_video.full_text_embedding)}")
+            print(
+                f"   Full text embedding dimensions: {len(processed_video.full_text_embedding)}"
+            )
 
         if processed_video.metadata_embedding:
-            print(f"   Metadata embedding dimensions: {len(processed_video.metadata_embedding)}")
+            print(
+                f"   Metadata embedding dimensions: {len(processed_video.metadata_embedding)}"
+            )
 
-   
+    async def get_video_by_id(video_id: str) -> Optional[Dict]:
+        try:
+            client = MongoClient(MONGODB_ATLAS_CLUSTER_URI)
+            db = client[DB_NAME]
+            collection = db[COLLECTION_NAME]
+
+            video_data = collection.find_one({"video_id": video_id})
+            client.close()
+            return video_data
+        except Exception as e:
+            logger.error(f"Error fetching video {video_id}: {e}")
+            return None
+
+    async def search_videos(self, query: str, limit: int = 5) -> List[Dict]:
+        """Search for similar videos using vector search"""
+        return await self.mongo_saver.search_similar_content(query, limit)
+
+    def close(self):
+        """Close all connections"""
+        if hasattr(self, "mongo_saver"):
+            self.mongo_saver.close()
+        if hasattr(self, "session"):
+            self.session.close()
 
     async def get_all_available_captions(self, url: str) -> Dict[str, any]:
         """Get information about all available caption tracks"""
@@ -728,11 +858,11 @@ class YouTubeVideoService:
                         "code": track.language_code,
                         "name": track.language_name,
                         "auto_generated": track.is_auto_generated,
-                        "translatable": track.is_translatable
+                        "translatable": track.is_translatable,
                     }
                     for track in available_captions
                 ],
-                "total_tracks": len(available_captions)
+                "total_tracks": len(available_captions),
             }
 
         except Exception as e:
@@ -755,7 +885,9 @@ class YouTubeVideoService:
         srt_content = []
         for i, caption in enumerate(captions, 1):
             start = self._seconds_to_srt_time(caption.get("start", 0))
-            end = self._seconds_to_srt_time(caption.get("start", 0) + caption.get("duration", 0))
+            end = self._seconds_to_srt_time(
+                caption.get("start", 0) + caption.get("duration", 0)
+            )
             srt_content.append(f"{i}\n{start} --> {end}\n{caption.get('text', '')}\n")
         return "\n".join(srt_content)
 
@@ -764,7 +896,9 @@ class YouTubeVideoService:
         vtt_content = ["WEBVTT\n"]
         for caption in captions:
             start = self._seconds_to_vtt_time(caption.get("start", 0))
-            end = self._seconds_to_vtt_time(caption.get("start", 0) + caption.get("duration", 0))
+            end = self._seconds_to_vtt_time(
+                caption.get("start", 0) + caption.get("duration", 0)
+            )
             vtt_content.append(f"{start} --> {end}\n{caption.get('text', '')}\n")
         return "\n".join(vtt_content)
 
@@ -783,17 +917,6 @@ class YouTubeVideoService:
         secs = seconds % 60
         return f"{hours:02d}:{minutes:02d}:{secs:06.3f}"
 
-    async def search_videos(self, query: str, limit: int = 5) -> List[Dict]:
-        """Search for similar videos using vector search"""
-        return await self.mongo_saver.search_similar_content(query, limit)
-
-    def close(self):
-        """Close all connections"""
-        if hasattr(self, 'mongo_saver'):
-            self.mongo_saver.close()
-        if hasattr(self, 'session'):
-            self.session.close()
-
 
 # Utility functions for MongoDB operations
 async def search_videos_by_content(query: str, limit: int = 2) -> List[Dict]:
@@ -806,27 +929,9 @@ async def search_videos_by_content(query: str, limit: int = 2) -> List[Dict]:
         saver.close()
 
 
-async def get_video_by_id(video_id: str) -> Optional[Dict]:
-    """Get video data from MongoDB by video ID"""
-    try:
-        client = MongoClient(MONGODB_ATLAS_CLUSTER_URI)
-        db = client[DB_NAME]
-        collection = db[COLLECTION_NAME]
-        
-        video_data = collection.find_one({"video_id": video_id})
-        client.close()
-        
-        return video_data
-    except Exception as e:
-        logger.error(f"Error fetching video {video_id}: {e}")
-        return None
-
-
 async def main():
     """Main function to test the YouTube video processing and MongoDB storage"""
-    test_urls = [
-        "https://www.youtube.com/watch?v=GzrULKF4jk8"
-    ]
+    test_urls = ["https://www.youtube.com/watch?v=GzrULKF4jk8"]
 
     service = YouTubeVideoService()
 
@@ -834,14 +939,14 @@ async def main():
         for url in test_urls:
             print(f"\n{'=' * 60}")
             print(f"Testing URL: {url}")
-            print('=' * 60)
+            print("=" * 60)
 
             try:
                 # Process video with embeddings and save to MongoDB
-                processed_video, save_result = await service.process_video_with_embeddings(
-                    url, 
-                    languages=['en'],
-                    save_to_db=True
+                processed_video, save_result = (
+                    await service.process_video_with_embeddings(
+                        url, languages=["en"], save_to_db=True
+                    )
                 )
 
                 print(f"\n📹 Video Info:")
@@ -851,45 +956,60 @@ async def main():
                 print(f"   View Count: {processed_video.video_info.view_count}")
 
                 print(f"\n📝 Captions Info:")
-                print(f"   Full Text Length: {len(processed_video.captions_text)} characters")
+                print(
+                    f"   Full Text Length: {len(processed_video.captions_text)} characters"
+                )
                 print(f"   VTT Length: {len(processed_video.captions_vtt)} characters")
-                print(f"   Individual Segments: {len(processed_video.caption_segments)}")
+                print(
+                    f"   Individual Segments: {len(processed_video.caption_segments)}"
+                )
 
                 # Display embeddings
-                service.display_embeddings_with_timestamps(processed_video, max_segments=5)
+                service.display_embeddings_with_timestamps(
+                    processed_video, max_segments=5
+                )
 
                 # Show MongoDB save results
                 if save_result:
                     print(f"\n💾 MongoDB SAVE RESULTS:")
                     print("=" * 40)
                     print(f"   Success: {save_result['success']}")
-                    print(f"   Total documents saved: {save_result.get('total_documents', 0)}")
-                    print(f"   Metadata saved: {save_result.get('metadata_saved', False)}")
-                    print(f"   Full text saved: {save_result.get('full_text_saved', False)}")
+                    print(
+                        f"   Total documents saved: {save_result.get('total_documents', 0)}"
+                    )
+                    print(
+                        f"   Metadata saved: {save_result.get('metadata_saved', False)}"
+                    )
+                    print(
+                        f"   Full text saved: {save_result.get('full_text_saved', False)}"
+                    )
                     print(f"   Segments saved: {save_result.get('segments_saved', 0)}")
-                    
-                    if not save_result['success']:
+
+                    if not save_result["success"]:
                         print(f"   Error: {save_result.get('error', 'Unknown error')}")
 
-                # Export JSON demo
+               
                 print(f"\n💾 JSON EXPORT DEMO:")
                 print("=" * 30)
                 json_data = service.export_embeddings_json(processed_video)
                 print(f"JSON export length: {len(json_data)} characters")
 
-                # Test search functionality
                 print(f"\n🔍 SEARCH TEST:")
                 print("=" * 20)
-                search_query = processed_video.video_info.title[:50]  # Use part of title as search query
+                search_query = processed_video.video_info.title[
+                    :50
+                ]  # Use part of title as search query
                 search_results = await service.search_videos(search_query, limit=3)
                 print(f"Search query: '{search_query}'")
                 print(f"Found {len(search_results)} similar videos")
-                
+
                 for i, result in enumerate(search_results, 1):
                     print(f"   {i}. Score: {result.get('similarity_score', 0):.4f}")
                     print(f"      Content: {result.get('content', '')[:100]}...")
 
-                print(f"\n✅ Successfully processed and saved video with timestamped embeddings!")
+                print(
+                    f"\n✅ Successfully processed and saved video with timestamped embeddings!"
+                )
 
             except Exception as e:
                 print(f"❌ Error processing {url}: {e}")
@@ -904,44 +1024,50 @@ async def main():
 
 
 # Example usage functions
-async def process_single_video(url: str, languages: List[str] = None) -> Tuple[ProcessedVideo, Dict]:
+async def process_single_video(
+    url: str, languages: List[str] = None
+) -> Tuple[ProcessedVideo, Dict]:
     """Process a single video and save to MongoDB"""
     service = YouTubeVideoService()
     try:
-        return await service.process_video_with_embeddings(url, languages or ['en'], save_to_db=True)
+        return await service.process_video_with_embeddings(
+            url, languages or ["en"], save_to_db=True
+        )
     finally:
         service.close()
 
 
-async def batch_process_videos(urls: List[str], languages: List[str] = None) -> List[Dict]:
+async def batch_process_videos(
+    urls: List[str], languages: List[str] = None
+) -> List[Dict]:
     """Process multiple videos in batch"""
     service = YouTubeVideoService()
     results = []
-    
+
     try:
         for url in urls:
             try:
-                processed_video, save_result = await service.process_video_with_embeddings(
-                    url, languages or ['en'], save_to_db=True
+                processed_video, save_result = (
+                    await service.process_video_with_embeddings(
+                        url, languages or ["en"], save_to_db=True
+                    )
                 )
-                results.append({
-                    "url": url,
-                    "video_id": processed_video.video_info.video_id,
-                    "title": processed_video.video_info.title,
-                    "success": True,
-                    "segments_count": len(processed_video.caption_segments),
-                    "save_result": save_result
-                })
+                results.append(
+                    {
+                        "url": url,
+                        "video_id": processed_video.video_info.video_id,
+                        "title": processed_video.video_info.title,
+                        "success": True,
+                        "segments_count": len(processed_video.caption_segments),
+                        "save_result": save_result,
+                    }
+                )
             except Exception as e:
-                results.append({
-                    "url": url,
-                    "success": False,
-                    "error": str(e)
-                })
+                results.append({"url": url, "success": False, "error": str(e)})
                 logger.error(f"Error processing {url}: {e}")
     finally:
         service.close()
-    
+
     return results
 
 
@@ -949,8 +1075,8 @@ if __name__ == "__main__":
     # Set up logging
     logging.basicConfig(
         level=logging.INFO,
-        format='%(asctime)s - %(name)s - %(levelname)s - %(message)s'
+        format="%(asctime)s - %(name)s - %(levelname)s - %(message)s",
     )
-    
+
     # Run the main function
     asyncio.run(main())
