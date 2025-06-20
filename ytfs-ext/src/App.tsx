@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import  { useState } from 'react';
 
 function App() {
   const [videoLink, setVideoLink] = useState('');
@@ -7,11 +7,11 @@ function App() {
   const [fullTextSearch, setFullTextSearch] = useState(false);
   const [advancedSearch, setAdvancedSearch] = useState(false);
 
-  const handleVideoLinkChange = (e) => {
+  const handleVideoLinkChange = (e:any) => {
     setVideoLink(e.target.value);
   };
 
-  const handleSearchKeywordChange = (e) => {
+  const handleSearchKeywordChange = (e:any) => {
     setSearchKeyword(e.target.value);
   };
 
@@ -75,10 +75,7 @@ function App() {
         </div>
 
         {/* Search Keyword Input */}
-        <div className="space-y-2">
-          <label className="block text-sm font-medium text-gray-300">
-            Search Keyword
-          </label>
+      
           <div className="relative">
             <input
               type="text"
@@ -203,7 +200,7 @@ function App() {
           </div>
         )}
       </div>
-    </div>
+   
   );
 }
 
