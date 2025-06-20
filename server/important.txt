@@ -1,0 +1,4 @@
+pip install --prefer-binary pydantic pydantic-settings
+
+
+this way install pydantic pydantic-settings
