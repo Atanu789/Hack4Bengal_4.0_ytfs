@@ -1,13 +1,65 @@
 import { useState, useEffect, useRef } from 'react';
-import { Search, Brain, FileText, Settings, Zap, RefreshCw, Play, Sparkles, Eye, Layers, ChevronRight, Activity, Cpu, Globe, Star, Volume2, Mic, Target, Lightbulb, Filter, Maximize2, Network, Shield, Rocket, Wand2 } from 'lucide-react';
+import { Search, Brain, FileText, Settings,
+   Zap, RefreshCw, Play, Sparkles, Eye, Layers,
+    ChevronRight, Activity, Cpu, Globe, Star, Volume2,
+     Mic, Target, Lightbulb, 
+      Network, Shield, Rocket, Wand2 ,MicOff } from 'lucide-react';
+
 
 // Chrome extension type declarations
 declare global {
   interface Window {
     chrome?: any;
+      SpeechRecognition: typeof SpeechRecognition;
+    webkitSpeechRecognition: typeof SpeechRecognition;
+    webkitAudioContext: typeof AudioContext;
   }
 }
+interface SpeechRecognition extends EventTarget {
+  continuous: boolean;
+  interimResults: boolean;
+  lang: string;
+  maxAlternatives: number;
+  onstart: ((this: SpeechRecognition, ev: Event) => any) | null;
+  onresult: ((this: SpeechRecognition, ev: SpeechRecognitionEvent) => any) | null;
+  onerror: ((this: SpeechRecognition, ev: SpeechRecognitionErrorEvent) => any) | null;
+  onend: ((this: SpeechRecognition, ev: Event) => any) | null;
+  start(): void;
+  stop(): void;
+}
 
+interface SpeechRecognitionEvent extends Event {
+  resultIndex: number;
+  results: SpeechRecognitionResultList;
+}
+
+interface SpeechRecognitionResultList {
+  readonly length: number;
+  item(index: number): SpeechRecognitionResult;
+  [index: number]: SpeechRecognitionResult;
+}
+
+interface SpeechRecognitionResult {
+  readonly length: number;
+  item(index: number): SpeechRecognitionAlternative;
+  [index: number]: SpeechRecognitionAlternative;
+  isFinal: boolean;
+}
+
+interface SpeechRecognitionAlternative {
+  transcript: string;
+  confidence: number;
+}
+
+interface SpeechRecognitionErrorEvent extends Event {
+  error: 'no-speech' | 'aborted' | 'audio-capture' | 'network' | 'not-allowed' | 'service-not-allowed' | 'bad-grammar' | 'language-not-supported';
+  message?: string;
+}
+
+declare var SpeechRecognition: {
+  prototype: SpeechRecognition;
+  new (): SpeechRecognition;
+};
 function App() {
   const [videoLink, setVideoLink] = useState('');
   const [searchKeyword, setSearchKeyword] = useState('');
@@ -20,8 +72,93 @@ function App() {
   // const [mousePosition, setMousePosition] = useState({ x: 0, y: 0 });
   const scrollContainerRef = useRef<HTMLDivElement>(null);
 
-  // Enhanced mouse tracking for premium effects
+   const [isListening, setIsListening] = useState<boolean>(false);
+  const [isSupported, setIsSupported] = useState<boolean>(false);
+  const [transcript, setTranscript] = useState<string>('');
+  const recognitionRef = useRef<SpeechRecognition | null>(null);
 
+  // Enhanced mouse tracking for premium effects
+  useEffect(() => {
+    // Check if speech recognition is supported
+    if ('webkitSpeechRecognition' in window || 'SpeechRecognition' in window) {
+      setIsSupported(true);
+      
+      const SpeechRecognitionConstructor = window.SpeechRecognition || window.webkitSpeechRecognition;
+      recognitionRef.current = new SpeechRecognitionConstructor();
+      
+      // Configure recognition settings
+      if (recognitionRef.current) {
+        recognitionRef.current.continuous = false;
+        recognitionRef.current.interimResults = true;
+        recognitionRef.current.lang = 'en-US';
+        recognitionRef.current.maxAlternatives = 1;
+
+        recognitionRef.current.onstart = () => {
+          console.log('Speech recognition started');
+          setIsListening(true);
+          setTranscript('');
+        };
+
+        recognitionRef.current.onresult = (event: SpeechRecognitionEvent) => {
+          console.log('Speech recognition result:', event);
+          let interimTranscript = '';
+          let finalTranscript = '';
+
+          for (let i = event.resultIndex; i < event.results.length; i++) {
+            const transcript = event.results[i][0].transcript;
+            if (event.results[i].isFinal) {
+              finalTranscript += transcript;
+            } else {
+              interimTranscript += transcript;
+            }
+          }
+
+          const currentTranscript = finalTranscript || interimTranscript;
+          setTranscript(currentTranscript);
+          
+          if (finalTranscript) {
+            setSearchKeyword(finalTranscript.trim());
+            setIsListening(false);
+          }
+        };
+
+        recognitionRef.current.onerror = (event: SpeechRecognitionErrorEvent) => {
+          console.error('Speech recognition error:', event.error);
+          setIsListening(false);
+          setTranscript('');
+          
+          // Show user-friendly error messages
+          switch(event.error) {
+            case 'not-allowed':
+              alert('Microphone access denied. Please allow microphone access and try again.');
+              break;
+            case 'no-speech':
+              console.log('No speech detected');
+              break;
+            case 'network':
+              alert('Network error occurred. Please check your connection.');
+              break;
+            default:
+              console.log('Speech recognition error:', event.error);
+          }
+        };
+
+        recognitionRef.current.onend = () => {
+          console.log('Speech recognition ended');
+          setIsListening(false);
+        };
+      }
+    } else {
+      console.log('Speech recognition not supported');
+      setIsSupported(false);
+    }
+
+    return () => {
+      if (recognitionRef.current) {
+        recognitionRef.current.stop();
+      }
+    };
+  }, []);
 
   // Enhanced auto-detect video link
   useEffect(() => {
@@ -102,8 +239,77 @@ function App() {
     }
   }, [isSearching]);
 
-  const handleSearchKeywordChange = (e: any) => {
+ const handleSearchKeywordChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     setSearchKeyword(e.target.value);
+  };
+
+   const toggleListening = async (): Promise<void> => {
+    if (!isSupported) {
+      alert('Speech recognition is not supported in your browser. Please use Chrome, Edge, or Safari.');
+      return;
+    }
+
+    if (isListening && recognitionRef.current) {
+      recognitionRef.current.stop();
+      return;
+    }
+
+    try {
+      // Request microphone permission first
+      const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+      stream.getTracks().forEach(track => track.stop()); // Stop the stream, we just needed permission
+      
+      // Start speech recognition
+      if (recognitionRef.current) {
+        recognitionRef.current.start();
+        console.log('Starting speech recognition...');
+      }
+    } catch (error) {
+      console.error('Microphone access error:', error);
+      if (error instanceof Error) {
+        if (error.name === 'NotAllowedError') {
+          alert('Microphone access denied. Please allow microphone access in your browser settings and try again.');
+        } else if (error.name === 'NotFoundError') {
+          alert('No microphone found. Please connect a microphone and try again.');
+        } else {
+          alert('Error accessing microphone: ' + error.message);
+        }
+      }
+    }
+  };
+
+  const playBeep = (): void => {
+    try {
+      // Create a simple beep sound
+      const AudioContextConstructor = window.AudioContext || window.webkitAudioContext;
+      const audioContext = new AudioContextConstructor();
+      const oscillator = audioContext.createOscillator();
+      const gainNode = audioContext.createGain();
+      
+      oscillator.connect(gainNode);
+      gainNode.connect(audioContext.destination);
+      
+      oscillator.frequency.setValueAtTime(800, audioContext.currentTime);
+      gainNode.gain.setValueAtTime(0.3, audioContext.currentTime);
+      gainNode.gain.exponentialRampToValueAtTime(0.01, audioContext.currentTime + 0.2);
+      
+      oscillator.start(audioContext.currentTime);
+      oscillator.stop(audioContext.currentTime + 0.2);
+    } catch (error) {
+      console.log('Could not play beep sound:', error);
+    }
+  };
+
+  const handleVoiceClick = async (): Promise<void> => {
+    if (!isListening) {
+      // Only play beep if we're about to start listening
+      try {
+        playBeep();
+      } catch (error) {
+        console.log('Could not play beep sound:', error);
+      }
+    }
+    await toggleListening();
   };
 
   const handleSearch = async () => {
@@ -407,38 +613,98 @@ function App() {
             </div>
           </div>
 
-          <div className="space-y-3">
-            <h2 className="text-sm font-bold text-white flex items-center space-x-2">
-              <Search className="w-4 h-4 text-blue-400 animate-pulse" />
-              <span>Search Query</span>
-              <div className="flex-1 h-px bg-gradient-to-r from-blue-400/60 via-purple-400/40 to-transparent"></div>
-              <Wand2 className="w-3 h-3 text-purple-400" />
-            </h2>
-            <div className="relative group">
-              <div className="absolute -inset-0.5 bg-gradient-to-r from-blue-500/30 via-purple-500/30 to-pink-500/30 rounded-xl blur opacity-0 group-hover:opacity-100 transition-all duration-500"></div>
-              <div className="absolute inset-0 bg-gradient-to-r from-blue-500/10 to-purple-500/10 rounded-lg opacity-0 group-focus-within:opacity-100 transition-opacity duration-500"></div>
+         
+         {/* search */}
+  <div className="space-y-3">
+          <h2 className="text-sm font-bold text-white flex items-center space-x-2">
+            <Search className="w-4 h-4 text-blue-400 animate-pulse" />
+            <span>Search Query</span>
+            <div className="flex-1 h-px bg-gradient-to-r from-blue-400/60 via-purple-400/40 to-transparent"></div>
+            <Wand2 className="w-3 h-3 text-purple-400" />
+          </h2>
+          
+          <div className="relative group">
+            <div className="absolute -inset-0.5 bg-gradient-to-r from-blue-500/30 via-purple-500/30 to-pink-500/30 rounded-xl blur opacity-0 group-hover:opacity-100 transition-all duration-500"></div>
+            <div className="absolute inset-0 bg-gradient-to-r from-blue-500/10 to-purple-500/10 rounded-lg opacity-0 group-focus-within:opacity-100 transition-opacity duration-500"></div>
+            
+            <input
+              type="text"
+              value={searchKeyword}
+              onChange={handleSearchKeywordChange}
+              placeholder={isListening ? "Listening..." : "What to search in video..."}
+              className="relative w-full px-3 py-2 pl-10 pr-20 bg-gradient-to-r from-white/15 to-white/10 backdrop-blur-2xl 
+                border border-white/30 rounded-xl focus:outline-none focus:ring-1 focus:ring-blue-500/60 
+                focus:border-blue-400/60 placeholder-gray-400 text-white transition-all duration-500 
+                hover:bg-white/20 hover:border-white/40 text-sm font-medium shadow-lg hover:shadow-blue-500/20
+                focus:shadow-lg focus:shadow-purple-500/30"
+            />
+            
+            <div className="absolute left-3 top-1/2 transform -translate-y-1/2">
+              <Search className="w-4 h-4 text-gray-400 group-hover:text-blue-400 group-focus-within:text-purple-400 transition-colors duration-500" />
+            </div>
+            
+            <div className="absolute right-3 top-1/2 transform -translate-y-1/2 flex items-center space-x-2">
+              {/* Voice Search Button */}
+              <button
+                onClick={handleVoiceClick}
+                disabled={!isSupported}
+                className={`p-1.5 rounded-full transition-all duration-300 ${
+                  isListening
+                    ? 'bg-red-500/20 text-red-400 animate-pulse shadow-lg shadow-red-500/30'
+                    : isSupported
+                    ? 'bg-green-500/20 text-green-400 hover:bg-green-500/30 hover:scale-110 shadow-lg hover:shadow-green-500/30'
+                    : 'bg-gray-500/20 text-gray-500 cursor-not-allowed'
+                }`}
+                title={isListening ? "Stop listening" : "Start voice search"}
+              >
+                {isListening ? (
+                  <div className="relative">
+                    <MicOff className="w-4 h-4" />
+                    <div className="absolute -inset-1 border-2 border-red-400 rounded-full animate-ping"></div>
+                  </div>
+                ) : (
+                  <Mic className="w-4 h-4" />
+                )}
+              </button>
               
-              <input
-                type="text"
-                value={searchKeyword}
-                onChange={handleSearchKeywordChange}
-                placeholder="What do you wanna search..."
-                className="relative w-full px-3 py-2 pl-10 pr-9 bg-gradient-to-r from-white/15 to-white/10 backdrop-blur-2xl 
-                  border border-white/30 rounded-xl focus:outline-none focus:ring-1 focus:ring-blue-500/60 
-                  focus:border-blue-400/60 placeholder-gray-400 text-white transition-all duration-500 
-                  hover:bg-white/20 hover:border-white/40 text-sm font-medium shadow-lg hover:shadow-blue-500/20
-                  focus:shadow-lg focus:shadow-purple-500/30"
-              />
+              <div className="w-px h-4 bg-gradient-to-t from-purple-400/50 to-transparent"></div>
               
-              <div className="absolute left-3 top-1/2 transform -translate-y-1/2">
-                <Search className="w-4 h-4 text-gray-400 group-hover:text-blue-400 group-focus-within:text-purple-400 transition-colors duration-500" />
-              </div>
-              <div className="absolute right-3 top-1/2 transform -translate-y-1/2 flex items-center space-x-1">
+              <div className="flex items-center space-x-1">
                 <Cpu className="w-4 h-4 text-purple-400 animate-pulse" />
                 <div className="w-0.5 h-4 bg-gradient-to-t from-purple-400 to-transparent rounded-full animate-pulse"></div>
               </div>
             </div>
           </div>
+          
+          {/* Voice Status Indicator */}
+          {isListening && (
+            <div className="flex items-center justify-center space-x-2 text-sm text-green-400">
+              <Volume2 className="w-4 h-4 animate-pulse" />
+              <span>Listening... {transcript && `"${transcript}"`}</span>
+              <div className="flex space-x-1">
+                <div className="w-1 h-1 bg-green-400 rounded-full animate-bounce" style={{ animationDelay: '0ms' }}></div>
+                <div className="w-1 h-1 bg-green-400 rounded-full animate-bounce" style={{ animationDelay: '150ms' }}></div>
+                <div className="w-1 h-1 bg-green-400 rounded-full animate-bounce" style={{ animationDelay: '300ms' }}></div>
+              </div>
+            </div>
+          )}
+          
+          {/* Browser Support and Instructions */}
+          {!isSupported && (
+            <div className="text-xs text-amber-400 text-center bg-amber-500/10 border border-amber-500/20 rounded-lg p-2">
+              Voice search requires Chrome, Edge, or Safari browser
+            </div>
+          )}
+          
+          {isSupported && (
+            <div className="text-xs text-blue-300/70 text-center">
+              Click the microphone icon and allow microphone access to use voice search
+            </div>
+          )}
+        </div>
+
+        
+
 
           <div className="space-y-3">
             <h2 className="text-sm font-bold text-white flex items-center space-x-2">
@@ -600,35 +866,93 @@ function App() {
             </div>
           </div>
 
-          <div className="space-y-3">
-            <h2 className="text-sm font-bold text-white flex items-center space-x-2">
-              <Filter className="w-4 h-4 text-cyan-400 animate-pulse" />
-              <span>Quick Actions</span>
-              <div className="flex-1 h-px bg-gradient-to-r from-cyan-400/60 via-blue-400/40 to-transparent"></div>
-            </h2>
+           <div className="space-y-3">
+          <h2 className="text-sm font-bold text-white flex items-center space-x-2">
+            <Search className="w-4 h-4 text-blue-400 animate-pulse" />
+            <span>Search Query</span>
+            <div className="flex-1 h-px bg-gradient-to-r from-blue-400/60 via-purple-400/40 to-transparent"></div>
+            <Wand2 className="w-3 h-3 text-purple-400" />
+          </h2>
+          
+          <div className="relative group">
+            <div className="absolute -inset-0.5 bg-gradient-to-r from-blue-500/30 via-purple-500/30 to-pink-500/30 rounded-xl blur opacity-0 group-hover:opacity-100 transition-all duration-500"></div>
+            <div className="absolute inset-0 bg-gradient-to-r from-blue-500/10 to-purple-500/10 rounded-lg opacity-0 group-focus-within:opacity-100 transition-opacity duration-500"></div>
             
-            <div className="grid grid-cols-2 gap-2">
-              <button className="group relative p-2 bg-gradient-to-br from-white/10 to-white/5 backdrop-blur-2xl 
-                border border-white/20 rounded-lg hover:border-white/40 transition-all duration-500 
-                hover:scale-105 hover:shadow-md hover:shadow-cyan-500/20 overflow-hidden text-xs">
-                <div className="absolute inset-0 bg-gradient-to-br from-cyan-500/10 to-blue-500/10 opacity-0 group-hover:opacity-100 transition-opacity duration-500"></div>
-                <div className="relative flex items-center space-x-1">
-                  <Mic className="w-3 h-3 text-cyan-400 group-hover:animate-pulse" />
-                  <span className="font-medium text-white">Voice</span>
-                </div>
+            <input
+              type="text"
+              value={searchKeyword}
+              onChange={handleSearchKeywordChange}
+              placeholder={isListening ? "Listening..." : "What to search in video..."}
+              className="relative w-full px-3 py-2 pl-10 pr-20 bg-gradient-to-r from-white/15 to-white/10 backdrop-blur-2xl 
+                border border-white/30 rounded-xl focus:outline-none focus:ring-1 focus:ring-blue-500/60 
+                focus:border-blue-400/60 placeholder-gray-400 text-white transition-all duration-500 
+                hover:bg-white/20 hover:border-white/40 text-sm font-medium shadow-lg hover:shadow-blue-500/20
+                focus:shadow-lg focus:shadow-purple-500/30"
+            />
+            
+            <div className="absolute left-3 top-1/2 transform -translate-y-1/2">
+              <Search className="w-4 h-4 text-gray-400 group-hover:text-blue-400 group-focus-within:text-purple-400 transition-colors duration-500" />
+            </div>
+            
+            <div className="absolute right-3 top-1/2 transform -translate-y-1/2 flex items-center space-x-2">
+              {/* Voice Search Button */}
+              <button
+                onClick={handleVoiceClick}
+                disabled={!isSupported}
+                className={`p-1.5 rounded-full transition-all duration-300 ${
+                  isListening
+                    ? 'bg-red-500/20 text-red-400 animate-pulse shadow-lg shadow-red-500/30'
+                    : isSupported
+                    ? 'bg-green-500/20 text-green-400 hover:bg-green-500/30 hover:scale-110 shadow-lg hover:shadow-green-500/30'
+                    : 'bg-gray-500/20 text-gray-500 cursor-not-allowed'
+                }`}
+                title={isListening ? "Stop listening" : "Start voice search"}
+              >
+                {isListening ? (
+                  <div className="relative">
+                    <MicOff className="w-4 h-4" />
+                    <div className="absolute -inset-1 border-2 border-red-400 rounded-full animate-ping"></div>
+                  </div>
+                ) : (
+                  <Mic className="w-4 h-4" />
+                )}
               </button>
               
-              <button className="group relative p-2 bg-gradient-to-br from-white/10 to-white/5 backdrop-blur-2xl 
-                border border-white/20 rounded-lg hover:border-white/40 transition-all duration-500 
-                hover:scale-105 hover:shadow-md hover:shadow-purple-500/20 overflow-hidden text-xs">
-                <div className="absolute inset-0 bg-gradient-to-br from-purple-500/10 to-pink-500/10 opacity-0 group-hover:opacity-100 transition-opacity duration-500"></div>
-                <div className="relative flex items-center space-x-1">
-                  <Maximize2 className="w-3 h-3 text-purple-400 group-hover:animate-pulse" />
-                  <span className="font-medium text-white">Full Screen</span>
-                </div>
-              </button>
+              <div className="w-px h-4 bg-gradient-to-t from-purple-400/50 to-transparent"></div>
+              
+              <div className="flex items-center space-x-1">
+                <Cpu className="w-4 h-4 text-purple-400 animate-pulse" />
+                <div className="w-0.5 h-4 bg-gradient-to-t from-purple-400 to-transparent rounded-full animate-pulse"></div>
+              </div>
             </div>
           </div>
+          
+          {/* Voice Status Indicator */}
+          {isListening && (
+            <div className="flex items-center justify-center space-x-2 text-sm text-green-400">
+              <Volume2 className="w-4 h-4 animate-pulse" />
+              <span>Listening... {transcript && `"${transcript}"`}</span>
+              <div className="flex space-x-1">
+                <div className="w-1 h-1 bg-green-400 rounded-full animate-bounce" style={{ animationDelay: '0ms' }}></div>
+                <div className="w-1 h-1 bg-green-400 rounded-full animate-bounce" style={{ animationDelay: '150ms' }}></div>
+                <div className="w-1 h-1 bg-green-400 rounded-full animate-bounce" style={{ animationDelay: '300ms' }}></div>
+              </div>
+            </div>
+          )}
+          
+          {/* Browser Support and Instructions */}
+          {!isSupported && (
+            <div className="text-xs text-amber-400 text-center bg-amber-500/10 border border-amber-500/20 rounded-lg p-2">
+              Voice search requires Chrome, Edge, or Safari browser
+            </div>
+          )}
+          
+          {isSupported && (
+            <div className="text-xs text-blue-300/70 text-center">
+              Click the microphone icon and allow microphone access to use voice search
+            </div>
+          )}
+        </div>
         </div>
 
         <div className="relative p-4 pt-2 bg-gradient-to-t from-black/50 to-transparent backdrop-blur-xl border-t border-white/10 flex-shrink-0">
