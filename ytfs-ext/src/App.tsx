@@ -1,4 +1,11 @@
-import  { useState } from 'react';
+import { useState, useEffect } from 'react';
+
+// Chrome extension type declarations
+declare global {
+  interface Window {
+    chrome?: any;
+  }
+}
 
 function App() {
   const [videoLink, setVideoLink] = useState('');
@@ -6,18 +13,71 @@ function App() {
   const [semanticSearch, setSemanticSearch] = useState(false);
   const [fullTextSearch, setFullTextSearch] = useState(false);
   const [advancedSearch, setAdvancedSearch] = useState(false);
+  const [isVideoDetected, setIsVideoDetected] = useState(false);
 
-  const handleVideoLinkChange = (e:any) => {
-    setVideoLink(e.target.value);
-  };
+  // Auto-detect video link from current page
+  useEffect(() => {
+    const detectVideoLink = () => {
+      try {
+        // Check if we're in a Chrome extension context
+        if (typeof window !== 'undefined' && window.chrome && window.chrome.tabs) {
+          // Use callback-based Chrome API
+          window.chrome.tabs.query({ active: true, currentWindow: true }, (tabs: any[]) => {
+            const currentUrl = tabs[0]?.url || '';
+            
+            // Check if it's a supported video platform
+            if (currentUrl.includes('youtube.com/watch') || 
+                currentUrl.includes('youtu.be/') ||
+                currentUrl.includes('vimeo.com/') ||
+                currentUrl.includes('dailymotion.com/') ||
+                currentUrl.includes('twitch.tv/')) {
+              setVideoLink(currentUrl);
+              setIsVideoDetected(true);
+            } else {
+              setVideoLink('');
+              setIsVideoDetected(false);
+            }
+          });
+        } else {
+          // Fallback for non-extension context
+          const currentUrl = window.location.href;
+          
+          if (currentUrl.includes('youtube.com/watch') || 
+              currentUrl.includes('youtu.be/') ||
+              currentUrl.includes('vimeo.com/') ||
+              currentUrl.includes('dailymotion.com/') ||
+              currentUrl.includes('twitch.tv/')) {
+            setVideoLink(currentUrl);
+            setIsVideoDetected(true);
+          } else {
+            const videoElements = document.querySelectorAll('video, iframe[src*="youtube"], iframe[src*="vimeo"]');
+            if (videoElements.length > 0) {
+              setVideoLink(currentUrl);
+              setIsVideoDetected(true);
+            } else {
+              setVideoLink('');
+              setIsVideoDetected(false);
+            }
+          }
+        }
+      } catch (error) {
+        console.error('Error detecting video:', error);
+        setVideoLink('');
+        setIsVideoDetected(false);
+      }
+    };
 
-  const handleSearchKeywordChange = (e:any) => {
+    // Initial detection
+    detectVideoLink();
+  }, []);
+
+  const handleSearchKeywordChange = (e: any) => {
     setSearchKeyword(e.target.value);
   };
 
   const handleSearch = () => {
     if (!videoLink.trim()) {
-      alert('Please provide a video link first!');
+      alert('No video detected on this page!');
       return;
     }
     if (!searchKeyword.trim()) {
@@ -43,44 +103,106 @@ function App() {
     alert(`Searching for "${searchKeyword}" using: ${activeSearchTypes.join(', ')}`);
   };
 
+  const refreshVideoDetection = () => {
+    try {
+      if (typeof window !== 'undefined' && window.chrome && window.chrome.tabs) {
+        window.chrome.tabs.query({ active: true, currentWindow: true }, (tabs: any[]) => {
+          const currentUrl = tabs[0]?.url || '';
+          
+          if (currentUrl.includes('youtube.com/watch') || 
+              currentUrl.includes('youtu.be/') ||
+              currentUrl.includes('vimeo.com/') ||
+              currentUrl.includes('dailymotion.com/') ||
+              currentUrl.includes('twitch.tv/')) {
+            setVideoLink(currentUrl);
+            setIsVideoDetected(true);
+          } else {
+            setVideoLink('');
+            setIsVideoDetected(false);
+          }
+        });
+      } else {
+        const currentUrl = window.location.href;
+        if (currentUrl.includes('youtube.com/watch') || 
+            currentUrl.includes('youtu.be/') ||
+            currentUrl.includes('vimeo.com/') ||
+            currentUrl.includes('dailymotion.com/') ||
+            currentUrl.includes('twitch.tv/')) {
+          setVideoLink(currentUrl);
+          setIsVideoDetected(true);
+        } else {
+          const videoElements = document.querySelectorAll('video, iframe[src*="youtube"], iframe[src*="vimeo"]');
+          if (videoElements.length > 0) {
+            setVideoLink(currentUrl);
+            setIsVideoDetected(true);
+          } else {
+            setVideoLink('');
+            setIsVideoDetected(false);
+          }
+        }
+      }
+    } catch (error) {
+      console.error('Error refreshing video detection:', error);
+      setVideoLink('');
+      setIsVideoDetected(false);
+    }
+  };
+
   return (
     <div className="min-w-80 max-w-md mx-auto bg-gray-900 shadow-2xl rounded-lg overflow-hidden border border-gray-700">
       {/* Header */}
-        <div className="bg-gradient-to-r from-indigo-600 to-purple-700 px-6 py-4">
-    <h1 className="text-xl font-bold text-white text-center">
-     Video Navigation
-    
-  </h1>
-  <p className="font-normal text-sm text-gray-200">
-      now you can navigate to your favorite part of the video.....
-    </p>
-   </div>
-
+      <div className="bg-gradient-to-r from-indigo-600 to-purple-700 px-6 py-4">
+        <h1 className="text-xl font-bold text-white text-center">
+          Video Navigation
+        </h1>
+        <p className="font-normal text-sm text-gray-200">
+          now you can navigate to your favorite part of the video.....
+        </p>
+      </div>
 
       <div className="p-6 space-y-6">
-        {/* Video Link Input */}
+        {/* Video Detection Status */}
         <div className="space-y-2">
-          <label className="block text-sm font-medium text-gray-300">
-            Video Link
-          </label>
-          <div className="relative">
-            <input
-              type="url"
-              value={videoLink}
-              onChange={handleVideoLinkChange}
-              placeholder="https://youtube.com/watch?v=..."
-              className="w-full px-3 py-2 bg-gray-800 border border-gray-600 rounded-md focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent placeholder-gray-500 text-white"
-            />
-            <div className="absolute inset-y-0 right-0 flex items-center pr-3">
-              <svg className="w-4 h-4 text-gray-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13.828 10.172a4 4 0 00-5.656 0l-4 4a4 4 0 105.656 5.656l1.102-1.101m-.758-4.899a4 4 0 005.656 0l4-4a4 4 0 00-5.656-5.656l-1.1 1.1" />
-              </svg>
+          <div className="flex items-center justify-between">
+            <label className="block text-sm font-medium text-gray-300">
+              Video Detection
+            </label>
+            <button
+              onClick={refreshVideoDetection}
+              className="text-xs text-indigo-400 hover:text-indigo-300 transition-colors"
+            >
+              Refresh
+            </button>
+          </div>
+          
+          <div className={`p-3 rounded-lg border ${
+            isVideoDetected 
+              ? 'bg-green-900 border-green-700' 
+              : 'bg-red-900 border-red-700'
+          }`}>
+            <div className="flex items-center space-x-2">
+              <div className={`w-2 h-2 rounded-full ${
+                isVideoDetected ? 'bg-green-400' : 'bg-red-400'
+              }`}></div>
+              <span className={`text-sm font-medium ${
+                isVideoDetected ? 'text-green-200' : 'text-red-200'
+              }`}>
+                {isVideoDetected ? 'Video Detected' : 'No Video Found'}
+              </span>
             </div>
+            {isVideoDetected && (
+              <div className="mt-2 text-xs text-gray-300 break-all">
+                {videoLink.length > 60 ? `${videoLink.substring(0, 60)}...` : videoLink}
+              </div>
+            )}
           </div>
         </div>
 
         {/* Search Keyword Input */}
-      
+        <div className="space-y-2">
+          <label className="block text-sm font-medium text-gray-300">
+            Search Keyword
+          </label>
           <div className="relative">
             <input
               type="text"
@@ -181,13 +303,18 @@ function App() {
         {/* Search Button */}
         <button
           onClick={handleSearch}
-          className="w-full bg-gradient-to-r from-indigo-600 to-purple-700 hover:from-indigo-700 hover:to-purple-800 text-white font-medium py-3 px-4 rounded-lg transition-all duration-200 transform hover:scale-105 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-offset-2 focus:ring-offset-gray-900"
+          disabled={!isVideoDetected}
+          className={`w-full font-medium py-3 px-4 rounded-lg transition-all duration-200 transform focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-offset-2 focus:ring-offset-gray-900 ${
+            isVideoDetected
+              ? 'bg-gradient-to-r from-indigo-600 to-purple-700 hover:from-indigo-700 hover:to-purple-800 text-white hover:scale-105'
+              : 'bg-gray-700 text-gray-400 cursor-not-allowed'
+          }`}
         >
           <div className="flex items-center justify-center space-x-2">
             <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
             </svg>
-            <span>Start Search</span>
+            <span>{isVideoDetected ? 'Start Search' : 'No Video Available'}</span>
           </div>
         </button>
 
@@ -205,7 +332,7 @@ function App() {
           </div>
         )}
       </div>
-   
+    </div>
   );
 }
 

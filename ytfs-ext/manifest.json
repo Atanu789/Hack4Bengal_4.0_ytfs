@@ -1,12 +1,26 @@
 {
-  "name": "video Navigation",
+  "name": "Video Navigation Extension",
+  "description": "Navigate to your favorite part of a video using smart search options.",
   "version": "1.0",
   "manifest_version": 3,
   "action": {
     "default_popup": "index.html"
+   
   },
+ 
   "permissions": [
     "activeTab",
     "storage"
+  ],
+  "host_permissions": [
+    "https://www.youtube.com/*"
+  ],
+ 
+
+  "web_accessible_resources": [
+    {
+      "resources": ["icons/*"],
+      "matches": ["<all_urls>"]
+    }
   ]
 }
