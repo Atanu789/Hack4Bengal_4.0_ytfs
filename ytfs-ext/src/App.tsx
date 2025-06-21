@@ -46,11 +46,16 @@ function App() {
   return (
     <div className="min-w-80 max-w-md mx-auto bg-gray-900 shadow-2xl rounded-lg overflow-hidden border border-gray-700">
       {/* Header */}
-      <div className="bg-gradient-to-r from-indigo-600 to-purple-700 px-6 py-4">
-        <h1 className="text-xl font-bold text-white text-center">
-          Video Search Extension
-        </h1>
-      </div>
+        <div className="bg-gradient-to-r from-indigo-600 to-purple-700 px-6 py-4">
+    <h1 className="text-xl font-bold text-white text-center">
+     Video Navigation
+    
+  </h1>
+  <p className="font-normal text-sm text-gray-200">
+      now you can navigate to your favorite part of the video.....
+    </p>
+   </div>
+
 
       <div className="p-6 space-y-6">
         {/* Video Link Input */}
