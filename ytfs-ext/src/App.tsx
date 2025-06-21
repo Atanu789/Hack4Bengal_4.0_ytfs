@@ -17,24 +17,11 @@ function App() {
   const [isVideoDetected, setIsVideoDetected] = useState(false);
   const [isSearching, setIsSearching] = useState(false);
   const [searchProgress, setSearchProgress] = useState(0);
-  const [mousePosition, setMousePosition] = useState({ x: 0, y: 0 });
+  // const [mousePosition, setMousePosition] = useState({ x: 0, y: 0 });
   const scrollContainerRef = useRef<HTMLDivElement>(null);
 
   // Enhanced mouse tracking for premium effects
-  useEffect(() => {
-    const handleMouseMove = (e: MouseEvent) => {
-      const rect = scrollContainerRef.current?.getBoundingClientRect();
-      if (rect) {
-        setMousePosition({
-          x: ((e.clientX - rect.left) / rect.width) * 100,
-          y: ((e.clientY - rect.top) / rect.height) * 100
-        });
-      }
-    };
 
-    document.addEventListener('mousemove', handleMouseMove);
-    return () => document.removeEventListener('mousemove', handleMouseMove);
-  }, []);
 
   // Enhanced auto-detect video link
   useEffect(() => {
@@ -198,8 +185,8 @@ function App() {
 
   const SearchMethodCard = ({ icon: Icon, title, description, active, onClick, gradient, features }: any) => (
     <div 
-      className={`group relative cursor-pointer transition-all duration-500 transform hover:scale-[1.02] ${
-        active ? 'scale-[1.02]' : ''
+      className={`group relative cursor-pointer transition-all duration-500 transform hover:scale-[1.01] ${
+        active ? 'scale-[1.01]' : ''
       }`}
       onClick={onClick}
     >
@@ -209,7 +196,7 @@ function App() {
         ${active ? 'bg-gradient-to-br from-white/25 to-white/10' : ''}
       `}>
         <div className={`absolute inset-0 opacity-0 transition-all duration-500 ${
-          active ? 'opacity-100' : 'group-hover:opacity-60'
+          active ? 'opacity-50' : 'group-hover:opacity-60'
         } bg-gradient-to-br ${gradient} blur-xl`}></div>
         
         <div className={`absolute inset-0 opacity-0 transition-all duration-700 ${
@@ -221,11 +208,11 @@ function App() {
         <div className="relative z-10 space-y-2">
           <div className="flex items-center justify-between">
             <div className="flex items-center space-x-3">
-              <div className={`relative w-10 h-10 rounded-xl flex items-center justify-center transition-all duration-500 overflow-hidden
+              <div className={`relative w-8 h-8 rounded-xl flex items-center justify-center transition-all duration-500 overflow-hidden
                 ${active ? `bg-gradient-to-br ${gradient} shadow-lg shadow-purple-500/40` : 'bg-white/15 group-hover:bg-white/25 backdrop-blur-xl'}
               `}>
-                <div className={`absolute inset-0 bg-gradient-to-br ${gradient} opacity-0 transition-opacity duration-500 ${
-                  active ? 'opacity-100' : 'group-hover:opacity-50'
+                <div className={`absolute inset-0 bg-gradient-to-br ${gradient} opacity-0 transition-opacity duration-200 ${
+                  active ? 'opacity-20' : 'group-hover:opacity-50'
                 } blur-md`}></div>
                 <Icon className={`relative w-5 h-5 transition-all duration-500 ${
                   active ? 'text-white drop-shadow-md' : 'text-gray-300 group-hover:text-white'
@@ -251,7 +238,7 @@ function App() {
             }`}>
               {active && (
                 <>
-                  <div className={`w-2 h-2 rounded-full bg-gradient-to-br ${gradient} animate-pulse`}></div>
+                  <div className={`w-3 h-3 rounded-full bg-gradient-to-br ${gradient} animate-pulse`}></div>
                   <div className="absolute inset-0 bg-white/20 rounded-full animate-ping"></div>
                 </>
               )}
@@ -259,31 +246,17 @@ function App() {
           </div>
           
           {active && features && (
-            <div className="flex flex-wrap gap-1 pt-1 border-t border-white/20">
-              {features.map((feature: string, index: number) => (
-                <div key={index} className="px-1.5 py-0.5 bg-white/20 backdrop-blur-xl rounded-md text-[10px] text-white/90 
-                  border border-white/30 shadow-md animate-fadeIn" 
-                  style={{animationDelay: `${index * 100}ms`}}>
-                  {feature}
-                </div>
-              ))}
-            </div>
-          )}
-        </div>
-        
-        <div className="absolute inset-0 pointer-events-none opacity-0 group-hover:opacity-100 transition-opacity duration-500">
-          {[...Array(6)].map((_, i) => (
-            <div
-              key={i}
-              className={`absolute w-1 h-1 bg-gradient-to-r ${gradient} rounded-full animate-float`}
-              style={{
-                left: `${20 + (i * 10)}%`,
-                top: `${20 + (i * 8)}%`,
-                animationDelay: `${i * 0.2}s`,
-                animationDuration: `${2 + Math.random()}s`
-              }}
-            ></div>
-          ))}
+  <div className="flex flex-wrap gap-1 pt-1 border-t border-white/20">
+    {features.map((feature: string, index: number) => (
+      <div 
+        key={index} 
+        className="px-1.5 py-0.5 bg-white/20 backdrop-blur-xl rounded-md text-[10px] text-white/90 border border-white/30 shadow-md"
+      >
+        {feature}
+      </div>
+    ))}
+  </div>
+)}
         </div>
       </div>
     </div>
@@ -297,36 +270,7 @@ function App() {
       <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_bottom_right,_var(--tw-gradient-stops))] from-blue-900/40 via-indigo-900/30 to-transparent"></div>
       <div className="absolute inset-0 bg-[conic-gradient(from_0deg_at_50%_50%,_transparent_0deg,_purple-500/10_60deg,_transparent_120deg,_blue-500/10_180deg,_transparent_240deg,_pink-500/10_300deg,_transparent_360deg)] animate-spin" style={{animationDuration: '20s'}}></div>
       
-      <div 
-        className="absolute w-64 h-64 bg-gradient-to-br from-purple-500/20 via-pink-500/15 to-blue-500/20 rounded-full blur-3xl animate-pulse transition-all duration-1000"
-        style={{
-          left: `${-10 + mousePosition.x * 0.1}%`,
-          top: `${-10 + mousePosition.y * 0.1}%`,
-        }}
-      ></div>
-      <div 
-        className="absolute w-48 h-48 bg-gradient-to-br from-cyan-500/20 via-blue-500/15 to-indigo-500/20 rounded-full blur-3xl animate-pulse transition-all duration-1000"
-        style={{
-          right: `${-10 + (100 - mousePosition.x) * 0.1}%`,
-          bottom: `${-10 + (100 - mousePosition.y) * 0.1}%`,
-          animationDelay: '1.5s'
-        }}
-      ></div>
       
-      <div className="absolute inset-0 overflow-hidden pointer-events-none">
-        {[...Array(20)].map((_, i) => (
-          <div
-            key={i}
-            className={`absolute w-1 h-1 bg-gradient-to-r from-white/40 to-purple-400/40 rounded-full animate-float`}
-            style={{
-              left: `${Math.random() * 100}%`,
-              top: `${Math.random() * 100}%`,
-              animationDelay: `${Math.random() * 5}s`,
-              animationDuration: `${4 + Math.random() * 3}s`
-            }}
-          ></div>
-        ))}
-      </div>
 
       <div className="relative flex flex-col h-full backdrop-blur-2xl bg-gradient-to-b from-black/40 via-black/30 to-black/40 border border-white/20 shadow-2xl rounded-3xl m-1 overflow-hidden">
         
@@ -356,9 +300,10 @@ function App() {
             </div>
             <div className="flex flex-col items-end space-y-1">
               <div className="flex items-center space-x-1">
-                <div className="w-1.5 h-1.5 bg-green-400 rounded-full animate-pulse shadow-md shadow-green-400/50"></div>
-                <div className="w-1.5 h-1.5 bg-blue-400 rounded-full animate-pulse shadow-md shadow-blue-400/50" style={{animationDelay: '0.5s'}}></div>
-                <div className="w-1.5 h-1.5 bg-purple-400 rounded-full animate-pulse shadow-md shadow-purple-400/50" style={{animationDelay: '1s'}}></div>
+                <div className="w-2 h-2 bg-red-400 rounded-full animate-pulse shadow-md shadow-red-400/50"></div>
+                <div className="w-2 h-2 bg-green-400 rounded-full animate-pulse shadow-md shadow-green-400/50" style={{animationDelay: '0.5s'}}></div>
+                <div className="w-2 h-2 bg-blue-400 rounded-full animate-pulse shadow-md shadow-blue-400/50" style={{animationDelay: '1s'}}></div>
+                
               </div>
               <div className="flex items-center space-x-1 text-[10px] text-gray-400">
                 <Shield className="w-2.5 h-2.5" />
@@ -370,7 +315,7 @@ function App() {
 
         <div 
           ref={scrollContainerRef}
-          className="flex-1 overflow-y-auto scrollbar-hide px-4 py-3 space-y-4"
+          className="flex-1 overflow-y-auto scrollbar-hide px-4 py-2 space-y-3.5"
         >
           <div className="space-y-3">
             <div className="flex items-center justify-between">
@@ -385,7 +330,7 @@ function App() {
                   transition-all duration-500 border border-white/20 hover:border-white/40 hover:scale-105 backdrop-blur-xl
                   shadow-md hover:shadow-lg hover:shadow-blue-500/20 text-xs"
               >
-                <RefreshCw className="w-3 h-3 text-blue-400 group-hover:rotate-180 transition-transform duration-700" />
+                <RefreshCw className="w-3.5 h-3.5 text-blue-400 group-hover:rotate-180 transition-transform duration-700" />
                 <span className="text-gray-300 group-hover:text-white font-medium">Refresh</span>
               </button>
             </div>
@@ -477,7 +422,7 @@ function App() {
                 type="text"
                 value={searchKeyword}
                 onChange={handleSearchKeywordChange}
-                placeholder="What to search in video..."
+                placeholder="What do you wanna search..."
                 className="relative w-full px-3 py-2 pl-10 pr-9 bg-gradient-to-r from-white/15 to-white/10 backdrop-blur-2xl 
                   border border-white/30 rounded-xl focus:outline-none focus:ring-1 focus:ring-blue-500/60 
                   focus:border-blue-400/60 placeholder-gray-400 text-white transition-all duration-500 
