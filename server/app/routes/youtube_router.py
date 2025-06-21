@@ -5,6 +5,14 @@ from services.youtube_service import MongoDBEmbeddingSaver
 from dataclasses import asdict
 import asyncio
 from datetime import datetime
+import logging
+from pydantic import BaseModel
+from typing import Optional
+from services.youtube_global import YouTubeSearchService
+import os
+from dotenv import load_dotenv
+load_dotenv()
+logger = logging.getLogger(__name__)
 
 router = APIRouter(
     prefix="/youtube",
@@ -126,6 +134,76 @@ async def search_videos_by_content(
         return results
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
+
+
+
+
+class VideoSearchRequest(BaseModel):
+    query: str
+    url: str
+    limit: Optional[int] = 10
+
+@router.post("/video/search")
+async def semantic_search_videos(request: VideoSearchRequest):
+    try:
+        if not request.query:
+            raise HTTPException(status_code=400, detail="Query must not be empty")
+        
+        service = YouTubeVideoService(similarity_threshold=0.85)
+        try:
+            processed_video, save_result = await service.process_video_with_embeddings(
+                request.url, languages=["en"], save_to_db=True
+            )
+            service.display_segments_summary(processed_video, max_segments=5)
+            search_results = await service.search_videos(request.query, request.limit)
+            return search_results
+        except Exception as e:
+            print(f"❌ Error processing {request.url}: {e}")
+            logger.exception("Full error traceback:")
+            raise HTTPException(status_code=500, detail=str(e))
+    except Exception as e:
+        print(f"❌ Error processing: {e}")
+        logger.exception("Full error traceback:")
+        raise HTTPException(status_code=500, detail=str(e))
+class VideoSuggestionRequest(BaseModel):
+    url: str
+    query:str
+    limit: int 
+
+@router.post("/video/suggestion")
+async def suggest_videos(request: VideoSuggestionRequest):  # Use the Pydantic model
+    try:
+        url = request.url  # Extract URL from the request body
+        if not url:
+            raise HTTPException(status_code=400, detail="URL must not be empty")
+        query = request.query  # Extract URL from the request body
+        if not query:
+            raise HTTPException(status_code=400, detail="QUERY must not be empty")
+        limit = request.limit  # Extract URL from the request body
+      
+        API_KEY = os.getenv('YOUTUBE_API_KEY')
+        youtube_service = YouTubeVideoService(similarity_threshold=0.85)
+        youtube_search_service = YouTubeSearchService(API_KEY)
+        title = await youtube_service.get_video_info(url)
+        print(f"Video title: {type (title)}")
+        if not title:
+            raise HTTPException(status_code=404, detail="Video title not found")
+        results = youtube_search_service.search_videos(title.title,use_web_scraping=True)
+        if not results:
+            raise HTTPException(status_code=404, detail="No similar videos found")
+        
+        for video in results["videos"]:
+            processed_video, save_result = await youtube_service.process_video_with_embeddings(
+                request.url, languages=["en"], save_to_db=True
+            )
+            youtube_service.display_segments_summary(processed_video, max_segments=5)
+            search_results = await youtube_service.search_videos(request.query, request.limit)
+            return search_results
+     
+    except Exception as e:
+        logger.exception("Error in suggest_videos")
+        raise HTTPException(status_code=500, detail=str(e))
+
 
 def shutdown():
     """Clean up resources on shutdown"""

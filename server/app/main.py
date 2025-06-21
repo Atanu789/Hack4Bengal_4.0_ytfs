@@ -1,6 +1,6 @@
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
-from app.routes.youtube_router import router as youtube_router, shutdown
+from routes.youtube_router import router as youtube_router, shutdown
 import uvicorn
 import logging
 from dotenv import load_dotenv
@@ -66,7 +66,7 @@ if __name__ == "__main__":
     logger.info(f"Reload: {reload}, Workers: {workers}")
     
     uvicorn.run(
-        "app.main:app",
+        "main:app",
         host=host,
         port=port,
         reload=reload,

@@ -13,7 +13,7 @@ from youtube_transcript_api._errors import (
     NoTranscriptFound,
     VideoUnavailable,
 )
-from embedding_service import EmbeddingService
+from .embedding_service import EmbeddingService
 from aiolimiter import AsyncLimiter
 import os
 from datetime import datetime
@@ -69,8 +69,7 @@ class MongoDBEmbeddingSaver:
                 for i, segment in enumerate(processed_video.caption_segments):
                     segment_doc = {
                         "video_id": processed_video.video_info.video_id,
-                        "title": processed_video.video_info.title,
-                        "author": processed_video.video_info.author,
+                     
                         "document_type": "caption_segment",
                         "segment_index": i,
                         "text_content": segment.text,
