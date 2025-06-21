@@ -62,7 +62,8 @@ class MongoDBEmbeddingSaver:
         """Save optimized video embeddings to MongoDB (segments only)"""
         try:
             saved_documents = []
-
+            # Add this method to your MongoDBEmbeddingSaver class
+            
             # Save individual caption segments only
             if processed_video.caption_segments:
                 segment_docs = []
@@ -111,82 +112,95 @@ class MongoDBEmbeddingSaver:
                 "saved_documents": saved_documents,
             }
     async def search_similar_content(self, query_text: str, limit: int = 3, min_similarity_score: float = 0.7) -> List[Dict]:
-        """Search for similar content and return top segments with timestamps"""
-        try:
-            # Get embedding vector for the query text
-            query_vector = self.embedding_service.embed_query(query_text)
-            num_candidates = min(limit * 10, 100)
-            # Use $vectorSearch aggregation pipeline
-            pipeline = [
-                {
-                    "$vectorSearch": {
-                        "index": ATLAS_VECTOR_SEARCH_INDEX_NAME,
-                        "path": "embedding",
-                        "queryVector": query_vector,
-                        "numCandidates": num_candidates,
-                        "limit": limit * 3
-                    }
-                },
-                {"$addFields": {"similarity_score": {"$meta": "vectorSearchScore"}}},
-                {"$match": {
-                    "similarity_score": {"$gte": min_similarity_score},
-                    "timestamp_validated": {"$ne": False}
-                }},
-                {"$sort": {"similarity_score": -1}},
-                {
-                    "$project": {
-                        "_id": 0,
-                        "content": "$text_content",
-                        "video_id": "$video_id",
-                        "title": "$title",
-                        "author": "$author",
-                        "start_time": "$start_time",
-                        "end_time": "$end_time",
-                        "duration": "$duration",
-                        "is_merged": "$is_merged",
-                        "merged_count": "$merged_count",
-                        "original_segments": "$original_segments",
-                        "similarity_score": 1,
-                        "timestamp_validated": "$timestamp_validated",
-                        "dedup_key": {
-                            "$concat": [
-                                "$video_id",
-                                "_",
-                                {"$toString": "$start_time"},
-                                "_",
-                                {"$toString": "$end_time"}
-                            ]
-                        }
+        
+           query_vector = self.embedding_service.embed_query(query_text)
+           num_candidates = min(limit * 10, 100)
+        
+           pipeline = [
+            {
+                "$vectorSearch": {
+                    "index": ATLAS_VECTOR_SEARCH_INDEX_NAME,
+                    "path": "embedding",
+                    "queryVector": query_vector,
+                    "numCandidates": num_candidates,
+                    "limit": limit * 10  # Get more results for deduplication
+                }
+            },
+            {"$addFields": {"similarity_score": {"$meta": "vectorSearchScore"}}},
+            {"$match": {
+                "similarity_score": {"$gte": min_similarity_score},
+                "timestamp_validated": {"$ne": False}
+            }},
+            # Add deduplication key
+            {
+                "$addFields": {
+                    "dedup_key": {
+                        "$concat": [
+                            "$video_id",
+                            "_",
+                            {"$toString": "$start_time"},
+                            "_",
+                            {"$toString": "$end_time"}
+                        ]
                     }
                 }
-            ]
-            results = list(self.collection.aggregate(pipeline))
-            print(f"🔍 Found {results} similar segments for query '{query_text}'")
-            # Format results with timestamps
-            formatted_results = []
-            for result in results:
-                start_time = result.get("start_time", 0)
-                end_time = result.get("end_time", 0)
-                formatted_results.append({
-                    "content": result.get("content", ""),
-                    "video_id": result.get("video_id", ""),
-                    "title": result.get("title", ""),
-                    "author": result.get("author", ""),
-                    "start_timestamp": self._seconds_to_timestamp(start_time),
-                    "end_timestamp": self._seconds_to_timestamp(end_time),
-                    "start_time": start_time,
-                    "end_time": end_time,
-                    "duration": result.get("duration", 0),
-                    "is_merged": result.get("is_merged", False),
-                    "merged_count": result.get("merged_count", 1),
-                    "similarity_score": result.get("similarity_score", 0)
-                })
+            },
+            # Group by deduplication key and keep the highest scoring document
+            {
+                "$group": {
+                    "_id": "$dedup_key",
+                    "doc": {"$first": "$$ROOT"},
+                    "max_score": {"$max": "$similarity_score"}
+                }
+            },
+            # Replace root with the document
+            {"$replaceRoot": {"newRoot": "$doc"}},
+            {"$sort": {"similarity_score": -1}},
+            {"$limit": limit},
+            {
+                "$project": {
+                    "_id": 0,
+                    "content": "$text_content",
+                    "video_id": "$video_id",
+                    "title": "$title",
+                    "author": "$author",
+                    "start_time": "$start_time",
+                    "end_time": "$end_time",
+                    "duration": "$duration",
+                    "is_merged": "$is_merged",
+                    "merged_count": "$merged_count",
+                    "original_segments": "$original_segments",
+                    "similarity_score": 1,
+                    "timestamp_validated": "$timestamp_validated"
+                }
+            }
+        ]
+        
+           results = list(self.collection.aggregate(pipeline))
+           print(f"🔍 Found {len(results)} unique segments for query '{query_text}'")
+        
+        # Format results with timestamps
+           formatted_results = []
+           for result in results:
+              start_time = result.get("start_time", 0)
+              end_time = result.get("end_time", 0)
+              formatted_results.append({
+                "content": result.get("content", ""),
+                "video_id": result.get("video_id", ""),
+                "title": result.get("title", ""),
+                "author": result.get("author", ""),
+                "start_timestamp": self._seconds_to_timestamp(start_time),
+                "end_timestamp": self._seconds_to_timestamp(end_time),
+                "start_time": start_time,
+                "end_time": end_time,
+                "duration": result.get("duration", 0),
+                "is_merged": result.get("is_merged", False),
+                "merged_count": result.get("merged_count", 1),
+                "similarity_score": result.get("similarity_score", 0)
+            })
 
-            return formatted_results
+           return formatted_results
 
-        except Exception as e:
-            logger.error(f"Error performing vector search: {e}")
-            return []
     
     def _seconds_to_timestamp(self, seconds: float) -> str:
         """Convert seconds to readable timestamp (MM:SS or HH:MM:SS)"""
@@ -529,6 +543,7 @@ class YouTubeVideoService:
 
     async def search_videos(self, query: str, limit: int = 3) -> List[Dict]:
         """Search for similar videos and return top segments with timestamps"""
+        # // await self.mongo_saver.remove_duplicate_segments()
         return await self.mongo_saver.search_similar_content(query, limit)
         
     def display_segments_summary(self, processed_video: ProcessedVideo, max_segments: int = 5):
