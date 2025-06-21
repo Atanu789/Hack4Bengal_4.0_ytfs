@@ -3,7 +3,7 @@ import { Search, Brain, FileText, Settings,
    Zap, RefreshCw, Play, Sparkles, Eye, Layers,
     ChevronRight, Activity, Cpu, Globe, Star, Volume2,
      Mic, Target, Lightbulb, 
-      Network, Shield, Rocket, Wand2 ,MicOff, 
+      Network, Shield, Wand2 ,MicOff, 
       Maximize2,
       Filter} from 'lucide-react';
 
@@ -497,11 +497,10 @@ function App() {
               </div>
               <div className="space-y-0.5">
                 <h1 className="text-lg font-black bg-gradient-to-r from-white via-purple-200 to-pink-200 bg-clip-text text-transparent drop-shadow-md">
-                  AI Video Navigator
+                Smart Seek
                 </h1>
                 <p className="text-xs text-gray-300/90 flex items-center space-x-1">
-                  <Activity className="w-3 h-3 text-green-400 animate-pulse" />
-                  <span>Neural Search Engine</span>
+                  <span>Find What Matters, Instantly!</span>
                   <Network className="w-3 h-3 text-blue-400" />
                 </p>
               </div>
@@ -513,8 +512,8 @@ function App() {
                 <div className="w-2 h-2 bg-blue-400 rounded-full animate-pulse shadow-md shadow-blue-400/50" style={{animationDelay: '1s'}}></div>
                 
               </div>
-              <div className="flex items-center space-x-1 text-[10px] text-gray-400">
-                <Shield className="w-2.5 h-2.5" />
+              <div className="flex items-center space-x-1 text-[12px] text-gray-400">
+              <Shield className="text-yellow-200 w-2.5 h-2.5" />
                 <span>Premium</span>
               </div>
             </div>
@@ -528,8 +527,8 @@ function App() {
           <div className="space-y-3">
             <div className="flex items-center justify-between">
               <h2 className="text-sm font-bold text-white flex items-center space-x-2">
-                <Eye className="w-4 h-4 text-purple-400 animate-pulse" />
-                <span>Video Detection</span>
+                <Eye className="w-4 h-4 text-purple-200 " />
+                <span>Video Detector</span>
                 <div className="flex-1 h-px bg-gradient-to-r from-purple-400/60 via-blue-400/40 to-transparent"></div>
               </h2>
               <button
@@ -593,9 +592,8 @@ function App() {
                     <div className="flex flex-col items-center space-y-0.5">
                       <div className="flex items-center space-x-0.5">
                         <Star className="w-3 h-3 text-yellow-400 animate-pulse" />
-                        <Rocket className="w-3 h-3 text-blue-400 animate-bounce" />
                       </div>
-                      <span className="text-[10px] text-gray-300 font-medium">Premium</span>
+                      <span className="text-[12px] text-gray-300 font-medium">Premium</span>
                     </div>
                   )}
                 </div>
@@ -619,7 +617,7 @@ function App() {
          {/* search */}
   <div className="space-y-3">
           <h2 className="text-sm font-bold text-white flex items-center space-x-2">
-            <Search className="w-4 h-4 text-blue-400 animate-pulse" />
+            <Search className="w-4 h-4 text-blue-200 " />
             <span>Search Query</span>
             <div className="flex-1 h-px bg-gradient-to-r from-blue-400/60 via-purple-400/40 to-transparent"></div>
             <Wand2 className="w-3 h-3 text-purple-400" />
@@ -700,7 +698,7 @@ function App() {
           
           {isSupported && (
             <div className="text-xs text-blue-300/70 text-center">
-              Click the microphone icon and allow microphone access to use voice search
+              Allow microphone access to use voice search...
             </div>
           )}
         </div>
@@ -710,7 +708,7 @@ function App() {
 
           <div className="space-y-3">
             <h2 className="text-sm font-bold text-white flex items-center space-x-2">
-              <Brain className="w-4 h-4 text-purple-400 animate-pulse" />
+              <Brain className="w-4 h-4 text-purple-200 " />
               <span>Search Methods</span>
               <div className="flex-1 h-px bg-gradient-to-r from-purple-400/60 via-pink-400/40 to-transparent"></div>
               <Target className="w-3 h-3 text-pink-400" />
@@ -720,31 +718,31 @@ function App() {
               <SearchMethodCard
                 icon={Brain}
                 title="Semantic Search"
-                description="Contextual understanding"
+                
                 active={semanticSearch}
                 onClick={() => setSemanticSearch(!semanticSearch)}
                 gradient="from-purple-500 via-violet-500 to-pink-500"
-                features={['NLP', 'Context', 'Emotion']}
+                
               />
               
               <SearchMethodCard
                 icon={FileText}
                 title="Suggestion"
-                description="Transcript analysis"
+               
                 active={suggestion}
                 onClick={() => setSuggestion(!suggestion)}
                 gradient="from-emerald-500 via-green-500 to-teal-500"
-                features={['OCR', 'Subtitles', 'Keywords']}
+               
               />
               
               <SearchMethodCard
                 icon={Settings}
                 title="Advanced Search"
-                description="Multi-modal AI"
+               
                 active={advancedSearch}
                 onClick={() => setAdvancedSearch(!advancedSearch)}
                 gradient="from-orange-500 via-red-500 to-pink-500"
-                features={['Vision', 'Audio', 'Scenes']}
+               
               />
             </div>
           </div>
@@ -820,7 +818,7 @@ function App() {
 
           <div className="space-y-3">
             <h2 className="text-sm font-bold text-white flex items-center space-x-2">
-              <Lightbulb className="w-4 h-4 text-yellow-400 animate-pulse" />
+              <Lightbulb className="w-4 h-4 text-yellow-200 " />
               <span>AI Insights</span>
               <div className="flex-1 h-px bg-gradient-to-r from-yellow-400/60 via-orange-400/40 to-transparent"></div>
             </h2>
@@ -836,7 +834,6 @@ function App() {
                     <Volume2 className="w-3 h-3 text-blue-400" />
                     <span className="text-xs font-semibold text-white">Audio</span>
                   </div>
-                  <p className="text-[10px] text-gray-400">Voice recognition</p>
                   <div className="flex items-center space-x-1 mt-1">
                     <div className="flex-1 h-0.5 bg-white/20 rounded-full overflow-hidden">
                       <div className="h-full bg-gradient-to-r from-blue-400 to-purple-400 rounded-full animate-pulse" style={{width: '75%'}}></div>
@@ -856,7 +853,6 @@ function App() {
                     <Eye className="w-3 h-3 text-green-400" />
                     <span className="text-xs font-semibold text-white">Visual</span>
                   </div>
-                  <p className="text-[10px] text-gray-400">Object detection</p>
                   <div className="flex items-center space-x-1 mt-1">
                     <div className="flex-1 h-0.5 bg-white/20 rounded-full overflow-hidden">
                       <div className="h-full bg-gradient-to-r from-green-400 to-emerald-400 rounded-full animate-pulse" style={{width: '92%'}}></div>
@@ -872,7 +868,7 @@ function App() {
 
 <div className="space-y-3">
             <h2 className="text-sm font-bold text-white flex items-center space-x-2">
-              <Filter className="w-4 h-4 text-cyan-400 animate-pulse" />
+              <Filter className="w-4 h-4 text-cyan-200" />
               <span>Quick Actions</span>
               <div className="flex-1 h-px bg-gradient-to-r from-cyan-400/60 via-blue-400/40 to-transparent"></div>
             </h2>
@@ -884,7 +880,7 @@ function App() {
                 <div className="absolute inset-0 bg-gradient-to-br from-cyan-500/10 to-blue-500/10 opacity-0 group-hover:opacity-100 transition-opacity duration-500"></div>
                 <div className="relative flex items-center space-x-1">
                   <Mic className="w-3 h-3 text-cyan-400 group-hover:animate-pulse" />
-                  <span className="font-medium text-white">Voice</span>
+                  <span className="font-medium text-white">Suggestion</span>
                 </div>
               </button>
               
@@ -953,7 +949,7 @@ function App() {
                 <>
                   <Zap className="w-4 h-4 group-hover:animate-pulse drop-shadow-md" />
                   <span className="font-bold">
-                    {isVideoDetected ? 'AI Search' : 'No Video'}
+                    {isVideoDetected ? 'Start Smart Seek' : 'No Video'}
                   </span>
                   <ChevronRight className="w-4 h-4 group-hover:translate-x-0.5 transition-transform duration-500 drop-shadow-md" />
                 </>
@@ -961,10 +957,10 @@ function App() {
             </div>
             
             {isVideoDetected && !isSearching && (
-              <div className="absolute inset-0 rounded-xl opacity-0 group-hover:opacity-100 transition-opacity duration-500"
+              <div className="absolute inset-0 rounded-xl opacity-0 group-hover:opacity-80 transition-opacity duration-500"
                 style={{
                   background: 'linear-gradient(45deg, transparent 30%, rgba(255,255,255,0.1) 50%, transparent 70%)',
-                  animation: 'shimmer 2s infinite'
+                  animation: 'shimmer 1s infinite'
                 }}></div>
             )}
           </button>
