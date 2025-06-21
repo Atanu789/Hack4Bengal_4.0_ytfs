@@ -12,7 +12,7 @@ function App() {
   const [videoLink, setVideoLink] = useState('');
   const [searchKeyword, setSearchKeyword] = useState('');
   const [semanticSearch, setSemanticSearch] = useState(false);
-  const [fullTextSearch, setFullTextSearch] = useState(false);
+  const [suggestion, setSuggestion] = useState(false);
   const [advancedSearch, setAdvancedSearch] = useState(false);
   const [isVideoDetected, setIsVideoDetected] = useState(false);
   const [isSearching, setIsSearching] = useState(false);
@@ -118,7 +118,7 @@ function App() {
 
     const activeSearchTypes: string[] = [];
     if (semanticSearch) activeSearchTypes.push('Semantic Search');
-    if (fullTextSearch) activeSearchTypes.push('Full Text Search');
+    if (suggestion) activeSearchTypes.push('Suggestion');
     if (advancedSearch) activeSearchTypes.push('Advanced Search');
 
     if (activeSearchTypes.length === 0) {
@@ -262,17 +262,17 @@ function App() {
     </div>
   );
 
-  const hasActiveSearchMethods = semanticSearch || fullTextSearch || advancedSearch;
+  const hasActiveSearchMethods = semanticSearch || suggestion || advancedSearch;
 
   return (
-    <div className="w-[440px] h-[720px] flex flex-col bg-gradient-to-br from-slate-900 via-indigo-950 to-purple-950 relative overflow-hidden">
+    <div className="w-[380px] h-[830px] flex flex-col bg-gradient-to-br from-slate-900 via-indigo-950 to-purple-950 relative overflow-hidden rounded-xl">
       <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_top_left,_var(--tw-gradient-stops))] from-purple-900/30 via-slate-900/60 to-black/80"></div>
       <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_bottom_right,_var(--tw-gradient-stops))] from-blue-900/40 via-indigo-900/30 to-transparent"></div>
       <div className="absolute inset-0 bg-[conic-gradient(from_0deg_at_50%_50%,_transparent_0deg,_purple-500/10_60deg,_transparent_120deg,_blue-500/10_180deg,_transparent_240deg,_pink-500/10_300deg,_transparent_360deg)] animate-spin" style={{animationDuration: '20s'}}></div>
       
       
 
-      <div className="relative flex flex-col h-full backdrop-blur-2xl bg-gradient-to-b from-black/40 via-black/30 to-black/40 border border-white/20 shadow-2xl rounded-3xl m-1 overflow-hidden">
+      <div className="relative flex flex-col h-full backdrop-blur-2xl bg-gradient-to-b from-black/40 via-black/30 to-black/40 border border-white/20 shadow-2xl rounded-xl m-1 overflow-hidden">
         
         <div className="relative bg-gradient-to-r from-purple-600/25 via-blue-600/25 to-pink-600/25 backdrop-blur-3xl border-b border-white/20 px-4 py-3 flex-shrink-0">
           <div className="flex items-center justify-between">
@@ -315,7 +315,7 @@ function App() {
 
         <div 
           ref={scrollContainerRef}
-          className="flex-1 overflow-y-auto scrollbar-hide px-4 py-2 space-y-3.5"
+          className="flex-1 overflow-y-auto px-4 py-2 space-y-3.5 custom-scrollbar"
         >
           <div className="space-y-3">
             <div className="flex items-center justify-between">
@@ -461,10 +461,10 @@ function App() {
               
               <SearchMethodCard
                 icon={FileText}
-                title="Full Text Search"
+                title="Suggestion"
                 description="Transcript analysis"
-                active={fullTextSearch}
-                onClick={() => setFullTextSearch(!fullTextSearch)}
+                active={suggestion}
+                onClick={() => setSuggestion(!suggestion)}
                 gradient="from-emerald-500 via-green-500 to-teal-500"
                 features={['OCR', 'Subtitles', 'Keywords']}
               />
@@ -514,7 +514,7 @@ function App() {
                       <Brain className="relative w-3 h-3 ml-auto" />
                     </div>
                   )}
-                  {fullTextSearch && (
+                  {suggestion && (
                     <div className="group relative px-2 py-1.5 bg-gradient-to-r from-emerald-500/30 via-green-500/25 to-teal-500/30 
                       text-emerald-100 text-xs rounded-lg border border-emerald-400/40 
                       flex items-center space-x-1 shadow-md backdrop-blur-xl hover:scale-105 transition-all duration-500">
@@ -733,6 +733,53 @@ function App() {
         .scrollbar-hide::-webkit-scrollbar {
           display: none;
         }
+        /* Custom scrollbar styles */
+        .custom-scrollbar {
+          scrollbar-width: thin;
+          scrollbar-color: rgba(165, 180, 252, 0.5) transparent;
+        }
+        
+        .custom-scrollbar::-webkit-scrollbar {
+          width: 6px;
+        }
+        
+        .custom-scrollbar::-webkit-scrollbar-track {
+          background: transparent;
+          border-radius: 3px;
+        }
+        
+        .custom-scrollbar::-webkit-scrollbar-thumb {
+          background-color: rgba(165, 180, 252, 0.5);
+          border-radius: 3px;
+          transition: background-color 0.3s;
+        }
+        
+        .custom-scrollbar::-webkit-scrollbar-thumb:hover {
+          background-color: rgba(165, 180, 252, 0.7);
+        }
+        
+        /* Rounded corners for the main container */
+        .rounded-xl {
+          border-radius: 12px;
+        }
+        
+        /* Smooth transitions for scrollbar */
+        .custom-scrollbar {
+          transition: scrollbar-color 0.3s ease;
+        }
+        
+        /* Fancy scrollbar for Firefox */
+        @supports (scrollbar-color: auto) {
+          .custom-scrollbar {
+            scrollbar-width: thin;
+            scrollbar-color: rgba(165, 180, 252, 0.5) transparent;
+          }
+        }
+        ::-webkit-scrollbar {
+          width: 0px;
+          background: transparent;
+        }
+
       `}</style>
     </div>
   );
