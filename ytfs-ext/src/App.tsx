@@ -289,11 +289,10 @@ function App() {
               </div>
               <div className="space-y-0.5">
                 <h1 className="text-lg font-black bg-gradient-to-r from-white via-purple-200 to-pink-200 bg-clip-text text-transparent drop-shadow-md">
-                  AI Video Navigator
+                SmartSeek
                 </h1>
                 <p className="text-xs text-gray-300/90 flex items-center space-x-1">
-                  <Activity className="w-3 h-3 text-green-400 animate-pulse" />
-                  <span>Neural Search Engine</span>
+                  <span>Find What Matters, Instantly!</span>
                   <Network className="w-3 h-3 text-blue-400" />
                 </p>
               </div>
@@ -321,7 +320,7 @@ function App() {
             <div className="flex items-center justify-between">
               <h2 className="text-sm font-bold text-white flex items-center space-x-2">
                 <Eye className="w-4 h-4 text-purple-400 animate-pulse" />
-                <span>Video Detection</span>
+                <span>Video Detector</span>
                 <div className="flex-1 h-px bg-gradient-to-r from-purple-400/60 via-blue-400/40 to-transparent"></div>
               </h2>
               <button
