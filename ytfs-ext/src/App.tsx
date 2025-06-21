@@ -570,10 +570,10 @@ function App() {
                       )}
                     </div>
                     <div className={`absolute inset-0 rounded-full animate-ping opacity-30 ${
-                      isVideoDetected ? 'bg-emerald-400' : 'bg-red-400'
+                      isVideoDetected ? 'bg-emerald-600' : 'bg-red-600'
                     }`}></div>
                     <div className={`absolute -inset-0.5 rounded-full animate-ping opacity-20 ${
-                      isVideoDetected ? 'bg-emerald-400' : 'bg-red-400'
+                      isVideoDetected ? 'bg-emerald-600' : 'bg-red-600'
                     }`} style={{animationDelay: '0.5s'}}></div>
                   </div>
                   <div className="flex-1 space-y-0.5">
@@ -726,7 +726,7 @@ function App() {
               />
               
               <SearchMethodCard
-                icon={FileText}
+                icon={Lightbulb}
                 title="Suggestion"
                
                 active={suggestion}
@@ -770,37 +770,43 @@ function App() {
                 </div>
                 
                 <div className="grid grid-cols-2 gap-2">
-                  {semanticSearch && (
-                    <div className="group relative px-2 py-1.5 bg-gradient-to-r from-purple-500/30 via-violet-500/25 to-pink-500/30 
-                      text-purple-100 text-xs rounded-lg border border-purple-400/40 
-                      flex items-center space-x-1 shadow-md backdrop-blur-xl hover:scale-105 transition-all duration-500">
-                      <div className="absolute inset-0 bg-gradient-to-r from-purple-400/20 to-pink-400/20 rounded-lg opacity-0 group-hover:opacity-100 transition-opacity duration-300"></div>
-                      <div className="relative w-1.5 h-1.5 bg-purple-400 rounded-full animate-pulse shadow-md shadow-purple-400/50"></div>
-                      <span className="relative font-semibold">Semantic</span>
-                      <Brain className="relative w-3 h-3 ml-auto" />
-                    </div>
-                  )}
-                  {suggestion && (
-                    <div className="group relative px-2 py-1.5 bg-gradient-to-r from-emerald-500/30 via-green-500/25 to-teal-500/30 
-                      text-emerald-100 text-xs rounded-lg border border-emerald-400/40 
-                      flex items-center space-x-1 shadow-md backdrop-blur-xl hover:scale-105 transition-all duration-500">
-                      <div className="absolute inset-0 bg-gradient-to-r from-emerald-400/20 to-teal-400/20 rounded-lg opacity-0 group-hover:opacity-100 transition-opacity duration-300"></div>
-                      <div className="relative w-1.5 h-1.5 bg-emerald-400 rounded-full animate-pulse shadow-md shadow-emerald-400/50"></div>
-                      <span className="relative font-semibold">Text</span>
-                      <FileText className="relative w-3 h-3 ml-auto" />
-                    </div>
-                  )}
-                  {advancedSearch && (
-                    <div className="group relative px-2 py-1.5 bg-gradient-to-r from-orange-500/30 via-red-500/25 to-pink-500/30 
-                      text-orange-100 text-xs rounded-lg border border-orange-400/40 
-                      flex items-center space-x-1 shadow-md backdrop-blur-xl hover:scale-105 transition-all duration-500 col-span-2">
-                      <div className="absolute inset-0 bg-gradient-to-r from-orange-400/20 to-red-400/20 rounded-lg opacity-0 group-hover:opacity-100 transition-opacity duration-300"></div>
-                      <div className="relative w-1.5 h-1.5 bg-orange-400 rounded-full animate-pulse shadow-md shadow-orange-400/50"></div>
-                      <span className="relative font-semibold">Advanced AI</span>
-                      <Settings className="relative w-3 h-3 ml-auto" />
-                    </div>
-                  )}
-                </div>
+  {semanticSearch && (
+    <div className="group relative px-2 py-1.5 bg-gradient-to-r from-purple-500/40 via-violet-500/35 to-pink-500/40 
+      text-purple-100 text-xs rounded-lg border border-purple-400/60 
+      flex items-center space-x-1 shadow-lg backdrop-blur-xl hover:shadow-2xl hover:shadow-purple-500/30 
+      transition-all duration-700 ease-out animate-pulse hover:animate-none cursor-pointer">
+      <div className="absolute inset-0 bg-gradient-to-r from-purple-400/30 to-pink-400/30 rounded-lg opacity-0 group-hover:opacity-100 transition-opacity duration-500"></div>
+      <div className="absolute inset-0 bg-gradient-to-r from-purple-300/10 to-pink-300/10 rounded-lg animate-ping"></div>
+      <div className="relative w-2 h-2 bg-gradient-to-r from-purple-300 to-pink-300 rounded-full  shadow-lg shadow-purple-400/70"></div>
+      <span className="relative font-bold tracking-wide">Semantic</span>
+      <Brain className="relative w-3 h-3 ml-auto animate-pulse" />
+    </div>
+  )}
+  {suggestion && (
+    <div className="group relative px-2 py-1.5 bg-gradient-to-r from-emerald-500/40 via-green-500/35 to-teal-500/40 
+      text-emerald-100 text-xs rounded-lg border border-emerald-400/60 
+      flex items-center space-x-1 shadow-lg backdrop-blur-xl hover:shadow-2xl hover:shadow-emerald-500/30 
+      transition-all duration-700 ease-out animate-pulse hover:animate-none cursor-pointer">
+      <div className="absolute inset-0 bg-gradient-to-r from-emerald-400/30 to-teal-400/30 rounded-lg opacity-0 group-hover:opacity-100 transition-opacity duration-500"></div>
+      <div className="absolute inset-0 bg-gradient-to-r from-emerald-300/10 to-teal-300/10 rounded-lg animate-ping"></div>
+      <div className="relative w-2 h-2 bg-gradient-to-r from-emerald-300 to-teal-300 rounded-full  shadow-lg shadow-emerald-400/70"></div>
+      <span className="relative font-bold tracking-wide">Text</span>
+      <FileText className="relative w-3 h-3 ml-auto animate-pulse" />
+    </div>
+  )}
+  {advancedSearch && (
+    <div className="group relative px-2 py-1.5 bg-gradient-to-r from-orange-500/40 via-red-500/35 to-pink-500/40 
+      text-orange-100 text-xs rounded-lg border border-orange-400/60 
+      flex items-center space-x-1 shadow-lg backdrop-blur-xl hover:shadow-2xl hover:shadow-orange-500/30 
+      transition-all duration-700 ease-out col-span-2 animate-pulse hover:animate-none cursor-pointer">
+      <div className="absolute inset-0 bg-gradient-to-r from-orange-400/30 to-red-400/30 rounded-lg opacity-0 group-hover:opacity-100 transition-opacity duration-500"></div>
+      <div className="absolute inset-0 bg-gradient-to-r from-orange-300/10 to-red-300/10 rounded-lg animate-ping"></div>
+      <div className="relative w-2 h-2 bg-gradient-to-r from-orange-300 to-red-300 rounded-full  shadow-lg shadow-orange-400/70"></div>
+      <span className="relative font-bold tracking-wide">Advanced AI</span>
+      <Settings className="relative w-3 h-3 ml-auto animate-pulse" />
+    </div>
+  )}
+</div>
                 
                 <div className="flex items-center justify-between pt-1 border-t border-white/20 text-xs">
                   <div className="flex items-center space-x-1 text-gray-300">
@@ -816,53 +822,7 @@ function App() {
             </div>
           )}
 
-          <div className="space-y-3">
-            <h2 className="text-sm font-bold text-white flex items-center space-x-2">
-              <Lightbulb className="w-4 h-4 text-yellow-200 " />
-              <span>AI Insights</span>
-              <div className="flex-1 h-px bg-gradient-to-r from-yellow-400/60 via-orange-400/40 to-transparent"></div>
-            </h2>
-            
-            <div className="grid grid-cols-2 gap-3">
-              <div className="relative group p-2 bg-gradient-to-br from-white/10 to-white/5 backdrop-blur-2xl 
-                border border-white/20 rounded-lg hover:border-white/40 transition-all duration-500 overflow-hidden">
-                
-                <div className="absolute inset-0 bg-gradient-to-br from-blue-500/10 to-purple-500/10 opacity-0 group-hover:opacity-100 transition-opacity duration-500"></div>
-                
-                <div className="relative space-y-1">
-                  <div className="flex items-center space-x-1">
-                    <Volume2 className="w-3 h-3 text-blue-400" />
-                    <span className="text-xs font-semibold text-white">Audio</span>
-                  </div>
-                  <div className="flex items-center space-x-1 mt-1">
-                    <div className="flex-1 h-0.5 bg-white/20 rounded-full overflow-hidden">
-                      <div className="h-full bg-gradient-to-r from-blue-400 to-purple-400 rounded-full animate-pulse" style={{width: '75%'}}></div>
-                    </div>
-                    <span className="text-[10px] text-blue-400 font-medium">75%</span>
-                  </div>
-                </div>
-              </div>
-              
-              <div className="relative group p-2 bg-gradient-to-br from-white/10 to-white/5 backdrop-blur-2xl 
-                border border-white/20 rounded-lg hover:border-white/40 transition-all duration-500 overflow-hidden">
-                
-                <div className="absolute inset-0 bg-gradient-to-br from-green-500/10 to-emerald-500/10 opacity-0 group-hover:opacity-100 transition-opacity duration-500"></div>
-                
-                <div className="relative space-y-1">
-                  <div className="flex items-center space-x-1">
-                    <Eye className="w-3 h-3 text-green-400" />
-                    <span className="text-xs font-semibold text-white">Visual</span>
-                  </div>
-                  <div className="flex items-center space-x-1 mt-1">
-                    <div className="flex-1 h-0.5 bg-white/20 rounded-full overflow-hidden">
-                      <div className="h-full bg-gradient-to-r from-green-400 to-emerald-400 rounded-full animate-pulse" style={{width: '92%'}}></div>
-                    </div>
-                    <span className="text-[10px] text-green-400 font-medium">92%</span>
-                  </div>
-                </div>
-              </div>
-            </div>
-          </div>
+        
 
 
 
