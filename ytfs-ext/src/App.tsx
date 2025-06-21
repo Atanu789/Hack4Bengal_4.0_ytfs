@@ -514,12 +514,12 @@ function App() {
               </div>
               <div className="flex items-center space-x-1 text-[12px] text-gray-400">
               <Shield className="text-yellow-200 w-2.5 h-2.5" />
-                <span>Premium</span>
+                <span>Secure</span>
               </div>
             </div>
           </div>
         </div>
-
+ 
         <div 
           ref={scrollContainerRef}
           className="flex-1 overflow-y-auto px-4 py-2 space-y-3.5 custom-scrollbar"
@@ -648,7 +648,7 @@ function App() {
               <button
                 onClick={handleVoiceClick}
                 disabled={!isSupported}
-                className={`p-1.5 rounded-full transition-all duration-300 ${
+                className={`p-1 rounded-l transition-all duration-300 ${
                   isListening
                     ? 'bg-red-500/20 text-red-400 animate-pulse shadow-lg shadow-red-500/30'
                     : isSupported
