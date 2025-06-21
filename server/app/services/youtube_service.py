@@ -13,17 +13,17 @@ from youtube_transcript_api._errors import (
     NoTranscriptFound,
     VideoUnavailable,
 )
-from .embedding_service import EmbeddingService
+from embedding_service import EmbeddingService
 from aiolimiter import AsyncLimiter
 import os
 from datetime import datetime
+import time
 
 from langchain_mongodb import MongoDBAtlasVectorSearch
 
 logger = logging.getLogger(__name__)
 
 load_dotenv()
-
 
 MONGODB_ATLAS_CLUSTER_URI = os.getenv("MONGODB_URI")
 DB_NAME = os.getenv("DB_NAME")
@@ -33,7 +33,6 @@ ATLAS_VECTOR_SEARCH_INDEX_NAME = os.getenv("ATLAS_VECTOR_SEARCH_INDEX_NAME")
 
 class MongoDBEmbeddingSaver:
     def __init__(self):
-
         if not MONGODB_ATLAS_CLUSTER_URI:
             raise ValueError("MONGODB_URI environment variable is required")
 
@@ -76,7 +75,7 @@ class MongoDBEmbeddingSaver:
                 "document_type": "video_metadata",
                 "text_content": self._create_metadata_text(processed_video.video_info),
                 "embedding": processed_video.metadata_embedding,
-                "created_at": datetime.utcnow(),
+                "created_at": datetime.now(),
                 "full_text": processed_video.captions_text,
                 "total_segments": len(processed_video.caption_segments),
             }
@@ -100,7 +99,7 @@ class MongoDBEmbeddingSaver:
                     "document_type": "full_text",
                     "text_content": processed_video.captions_text,
                     "embedding": processed_video.full_text_embedding,
-                    "created_at": datetime.utcnow(),
+                    "created_at": datetime.now(),
                     "character_count": len(processed_video.captions_text),
                     "segment_count": len(processed_video.caption_segments),
                 }
@@ -131,7 +130,7 @@ class MongoDBEmbeddingSaver:
                         "formatted_start": segment.formatted_start,
                         "formatted_end": segment.formatted_end,
                         "embedding": segment.embedding,
-                        "created_at": datetime.utcnow(),
+                        "created_at": datetime.now(),
                         "character_count": len(segment.text),
                     }
                     segment_docs.append(segment_doc)
@@ -154,7 +153,6 @@ class MongoDBEmbeddingSaver:
                 "saved_documents": saved_documents,
                 "total_documents": len(saved_documents),
                 "metadata_saved": True,
-                "embedding": processed_video.metadata_embedding,
                 "full_text_saved": bool(processed_video.full_text_embedding),
                 "segments_saved": len(processed_video.caption_segments),
             }
@@ -190,25 +188,17 @@ class MongoDBEmbeddingSaver:
     ) -> List[Dict]:
         """Search for similar content using vector search"""
         try:
-            # Generate embedding for query
-            print(f"Generating embedding for query: {query_text}")
-            query_embedding = await asyncio.to_thread(
-            self.embedding_service.get_query_embedding, query_text
-        )
-            print(f"Query embedding generated: {query_embedding[:3]}...")
-            # Perform vector search
             results = self.vector_store.similarity_search_with_score(
-            query_embedding, k=limit
-        )
-
+                query_text, k=limit
+            )
             return [
-            {
-                "content": doc.page_content,
-                "metadata": doc.metadata,
-                "similarity_score": score,
-            }
-            for doc, score in results
-        ]
+                {
+                    "content": doc.page_content,
+                    "metadata": doc.metadata,
+                    "similarity_score": score,
+                }
+                for doc, score in results
+            ]
 
         except Exception as e:
             logger.error(f"Error performing vector search: {e}")
@@ -244,7 +234,6 @@ class CaptionTrack:
 @dataclass
 class VideoInfo:
     """Contains comprehensive video information"""
-
     video_id: str
     title: str
     description: str
@@ -262,7 +251,6 @@ class VideoInfo:
 @dataclass
 class CaptionSegment:
     """Represents a caption segment with timing and embedding"""
-
     text: str
     start_time: float
     end_time: float
@@ -282,55 +270,58 @@ class ProcessedVideo:
     full_text_embedding: List[float]
 
 
+class RateLimitedEmbeddingService:
+    """Wrapper around EmbeddingService with rate limiting and retry logic"""
+    
+    def __init__(self, requests_per_minute: int = 100):
+        self.embedding_service = EmbeddingService()
+        # Set rate limit to be more conservative than the API limit
+        self.limiter = AsyncLimiter(requests_per_minute, 60)  # 100 requests per 60 seconds
+        self.request_count = 0
+        self.start_time = time.time()
+        
+    async def get_embedding_with_retry(self, text: str, max_retries: int = 3) -> List[float]:
+        """Get embedding with rate limiting and retry logic"""
+        for attempt in range(max_retries):
+            try:
+                async with self.limiter:
+                    self.request_count += 1
+                    if self.request_count % 10 == 0:
+                        elapsed = time.time() - self.start_time
+                        rate = self.request_count / (elapsed / 60)
+                        print(f"📊 Embedding requests: {self.request_count}, Rate: {rate:.1f}/min")
+                    
+                    embedding = await asyncio.to_thread(
+                        self.embedding_service.get_document_embedding, text
+                    )
+                    return embedding
+                    
+            except Exception as e:
+                error_msg = str(e).lower()
+                if "rate_limit_exceeded" in error_msg or "quota exceeded" in error_msg:
+                    wait_time = (2 ** attempt) * 30  # Exponential backoff: 30s, 60s, 120s
+                    print(f"⚠️  Rate limit hit. Waiting {wait_time}s before retry {attempt + 1}/{max_retries}")
+                    await asyncio.sleep(wait_time)
+                    continue
+                else:
+                    logger.warning(f"Failed to embed text '{text[:50]}...': {e}")
+                    raise e
+        
+        raise Exception(f"Failed to get embedding after {max_retries} retries")
+
+
 class YouTubeVideoService:
-    def __init__(self, max_concurrent_embeddings: int = 3):
+    def __init__(self, max_concurrent_embeddings: int = 2, requests_per_minute: int = 80):
         self.session = requests.Session()
         self.limiter = AsyncLimiter(max_rate=2, time_period=1)
-        self.embedding_service = EmbeddingService()
-        self.semaphore = asyncio.Semaphore(
-            max_concurrent_embeddings
-        )  # Fixed: Added semaphore
+        self.embedding_service = RateLimitedEmbeddingService(requests_per_minute)
+        self.semaphore = asyncio.Semaphore(max_concurrent_embeddings)
         self.mongo_saver = MongoDBEmbeddingSaver()
         self.common_languages = [
-            "en",
-            "es",
-            "fr",
-            "de",
-            "it",
-            "pt",
-            "ru",
-            "ja",
-            "ko",
-            "zh",
-            "zh-CN",
-            "zh-TW",
-            "ar",
-            "hi",
-            "hi-IN",
-            "th",
-            "vi",
-            "id",
-            "ms",
-            "tl",
-            "sv",
-            "no",
-            "da",
-            "fi",
-            "nl",
-            "pl",
-            "tr",
-            "cs",
-            "hu",
-            "ro",
-            "bg",
-            "hr",
-            "sk",
-            "sl",
-            "et",
-            "lv",
-            "lt",
-            "uk",
-            "he",
+            "en", "es", "fr", "de", "it", "pt", "ru", "ja", "ko", "zh",
+            "zh-CN", "zh-TW", "ar", "hi", "hi-IN", "th", "vi", "id", "ms",
+            "tl", "sv", "no", "da", "fi", "nl", "pl", "tr", "cs", "hu",
+            "ro", "bg", "hr", "sk", "sl", "et", "lv", "lt", "uk", "he",
         ]
 
     def extract_video_id(self, url: str) -> Optional[str]:
@@ -345,7 +336,6 @@ class YouTubeVideoService:
             match = re.search(pattern, url)
             if match:
                 return match.group(1)
-
         return None
 
     async def get_video_metadata(self, video_id: str) -> Dict:
@@ -638,12 +628,36 @@ class YouTubeVideoService:
             logger.error(f"Error getting captions: {e}")
             return {"success": False, "error": str(e)}
 
+    def _combine_segments(self, segments: List[Dict], max_chars: int = 500) -> List[str]:
+        """Combine caption segments to reduce API calls while maintaining context"""
+        combined_segments = []
+        current_segment = ""
+        
+        for segment in segments:
+            text = segment.get("text", "").strip()
+            if not text:
+                continue
+                
+            # If adding this text would exceed the limit, save current and start new
+            if len(current_segment) + len(text) + 1 > max_chars and current_segment:
+                combined_segments.append(current_segment.strip())
+                current_segment = text
+            else:
+                current_segment += (" " + text if current_segment else text)
+        
+        # Add the last segment if it exists
+        if current_segment.strip():
+            combined_segments.append(current_segment.strip())
+            
+        return combined_segments
+
     async def process_video_with_embeddings(
         self,
         url: str,
         languages: Optional[List[str]] = None,
         embed_individual_segments: bool = True,
         save_to_db: bool = True,
+        combine_segments: bool = True,  # New parameter to control segment combination
     ) -> Tuple[ProcessedVideo, Optional[Dict]]:
         try:
             video_info = await self.get_video_info(url)
@@ -666,61 +680,92 @@ class YouTubeVideoService:
             caption_segments = []
 
             if embed_individual_segments and subtitle_segments:
-                print(
-                    f"Generating embeddings for {len(subtitle_segments)} caption segments..."
-                )
+                if combine_segments:
+                    # Combine segments to reduce API calls
+                    combined_texts = self._combine_segments(subtitle_segments, max_chars=400)
+                    print(f"🔄 Combined {len(subtitle_segments)} segments into {len(combined_texts)} groups")
+                    
+                    # Create segment embeddings for combined text
+                    async def process_combined_segment(text, index):
+                        try:
+                            async with self.semaphore:
+                                embedding = await self.embedding_service.get_embedding_with_retry(text)
+                                
+                            # Use the start time of the first segment in this group
+                            start_idx = sum(len(self._combine_segments(subtitle_segments[:i], max_chars=400)) 
+                                          for i in range(index))
+                            start_time = subtitle_segments[start_idx]["start"] if start_idx < len(subtitle_segments) else 0
+                            duration = 30.0  # Approximate duration for combined segments
+                            end_time = start_time + duration
 
-                async def process_segment(segment):
-                    text = segment.get("text", "").strip()
-                    if not text:
-                        return None
-                    try:
-                        start_time = segment.get("start", 0.0)
-                        duration = segment.get("duration", 0.0)
-                        end_time = start_time + duration
-
-                        async with self.semaphore:
-                            embedding = await asyncio.to_thread(
-                                self.embedding_service.get_document_embedding, text
+                            return CaptionSegment(
+                                text=text,
+                                start_time=start_time,
+                                end_time=end_time,
+                                duration=duration,
+                                embedding=embedding,
+                                formatted_start=self._seconds_to_vtt_time(start_time),
+                                formatted_end=self._seconds_to_vtt_time(end_time),
                             )
+                        except Exception as e:
+                            logger.warning(f"Failed to embed combined segment '{text[:50]}...': {e}")
+                            return None
 
-                        return CaptionSegment(
-                            text=text,
-                            start_time=start_time,
-                            end_time=end_time,
-                            duration=duration,
-                            embedding=embedding,
-                            formatted_start=self._seconds_to_vtt_time(start_time),
-                            formatted_end=self._seconds_to_vtt_time(end_time),
-                        )
-                    except Exception as e:
-                        logger.warning(f"Failed to embed segment '{text[:50]}...': {e}")
-                        return None
+                    print(f"🧠 Generating embeddings for {len(combined_texts)} combined segments...")
+                    caption_segments = await asyncio.gather(
+                        *[process_combined_segment(text, i) for i, text in enumerate(combined_texts)]
+                    )
+                    caption_segments = [seg for seg in caption_segments if seg is not None]
+                    
+                else:
+                    # Original individual segment processing
+                    print(f"🧠 Generating embeddings for {len(subtitle_segments)} individual segments...")
+                    
+                    async def process_segment(segment):
+                        text = segment.get("text", "").strip()
+                        if not text:
+                            return None
+                        try:
+                            start_time = segment.get("start", 0.0)
+                            duration = segment.get("duration", 0.0)
+                            end_time = start_time + duration
 
-                # Run segment processing with controlled concurrency
-                caption_segments = await asyncio.gather(
-                    *[process_segment(seg) for seg in subtitle_segments]
-                )
-                caption_segments = [seg for seg in caption_segments if seg is not None]
+                            async with self.semaphore:
+                                embedding = await self.embedding_service.get_embedding_with_retry(text)
 
-            print("Generating embedding for full caption text...")
+                            return CaptionSegment(
+                                text=text,
+                                start_time=start_time,
+                                end_time=end_time,
+                                duration=duration,
+                                embedding=embedding,
+                                formatted_start=self._seconds_to_vtt_time(start_time),
+                                formatted_end=self._seconds_to_vtt_time(end_time),
+                            )
+                        except Exception as e:
+                            logger.warning(f"Failed to embed segment '{text[:50]}...': {e}")
+                            return None
+
+                    # Process segments with rate limiting
+                    caption_segments = await asyncio.gather(
+                        *[process_segment(seg) for seg in subtitle_segments]
+                    )
+                    caption_segments = [seg for seg in caption_segments if seg is not None]
+
+            print("🧠 Generating embedding for full caption text...")
             full_text_embedding = []
             if captions_text:
                 try:
                     async with self.semaphore:
-                        full_text_embedding = await asyncio.to_thread(
-                            self.embedding_service.get_document_embedding, captions_text
-                        )
+                        full_text_embedding = await self.embedding_service.get_embedding_with_retry(captions_text)
                 except Exception as e:
                     logger.warning(f"Failed to generate full text embedding: {e}")
 
-            print("Generating embeddings for metadata...")
+            print("🧠 Generating embeddings for metadata...")
             metadata_embedding = []
             try:
                 async with self.semaphore:
-                    metadata_embedding = await asyncio.to_thread(
-                        self.embedding_service.get_document_embedding, metadata_text
-                    )
+                    metadata_embedding = await self.embedding_service.get_embedding_with_retry(metadata_text)
             except Exception as e:
                 logger.warning(f"Failed to generate metadata embedding: {e}")
 
@@ -732,6 +777,12 @@ class YouTubeVideoService:
                 metadata_embedding=metadata_embedding,
                 full_text_embedding=full_text_embedding,
             )
+
+            # Save to MongoDB if requested
+            save_result = None
+            if save_to_db:
+                print("💾 Saving embeddings to MongoDB...")
+                save_result = await self.mongo_saver.save_video_embeddings(processed_video)
 
             # Save to MongoDB if requested
             save_result = None
@@ -830,7 +881,7 @@ class YouTubeVideoService:
             logger.error(f"Error fetching video {video_id}: {e}")
             return None
 
-    async def search_videos(self, query: str, limit: int = 5) -> List[Dict]:
+    async def search_videos(self, query: str, limit: int = 5) -> str:
         """Search for similar videos using vector search"""
         return await self.mongo_saver.search_similar_content(query, limit)
 
@@ -931,7 +982,7 @@ async def search_videos_by_content(query: str, limit: int = 2) -> List[Dict]:
 
 async def main():
     """Main function to test the YouTube video processing and MongoDB storage"""
-    test_urls = ["https://www.youtube.com/watch?v=GzrULKF4jk8"]
+    test_urls = ["https://www.youtube.com/watch?v=s2skans2dP4"]
 
     service = YouTubeVideoService()
 
@@ -942,7 +993,7 @@ async def main():
             print("=" * 60)
 
             try:
-                # Process video with embeddings and save to MongoDB
+               
                 processed_video, save_result = (
                     await service.process_video_with_embeddings(
                         url, languages=["en"], save_to_db=True
@@ -989,16 +1040,14 @@ async def main():
                         print(f"   Error: {save_result.get('error', 'Unknown error')}")
 
                
-                print(f"\n💾 JSON EXPORT DEMO:")
-                print("=" * 30)
-                json_data = service.export_embeddings_json(processed_video)
-                print(f"JSON export length: {len(json_data)} characters")
+             
+               
 
                 print(f"\n🔍 SEARCH TEST:")
                 print("=" * 20)
-                search_query = processed_video.video_info.title[
-                    :50
-                ]  # Use part of title as search query
+                search_query = "What is React Router" 
+                print(f"Using search query: '{type (search_query)}'")
+                 # Use part of title as search query
                 search_results = await service.search_videos(search_query, limit=3)
                 print(f"Search query: '{search_query}'")
                 print(f"Found {len(search_results)} similar videos")
@@ -1037,38 +1086,6 @@ async def process_single_video(
         service.close()
 
 
-async def batch_process_videos(
-    urls: List[str], languages: List[str] = None
-) -> List[Dict]:
-    """Process multiple videos in batch"""
-    service = YouTubeVideoService()
-    results = []
-
-    try:
-        for url in urls:
-            try:
-                processed_video, save_result = (
-                    await service.process_video_with_embeddings(
-                        url, languages or ["en"], save_to_db=True
-                    )
-                )
-                results.append(
-                    {
-                        "url": url,
-                        "video_id": processed_video.video_info.video_id,
-                        "title": processed_video.video_info.title,
-                        "success": True,
-                        "segments_count": len(processed_video.caption_segments),
-                        "save_result": save_result,
-                    }
-                )
-            except Exception as e:
-                results.append({"url": url, "success": False, "error": str(e)})
-                logger.error(f"Error processing {url}: {e}")
-    finally:
-        service.close()
-
-    return results
 
 
 if __name__ == "__main__":
