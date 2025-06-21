@@ -3,7 +3,9 @@ import { Search, Brain, FileText, Settings,
    Zap, RefreshCw, Play, Sparkles, Eye, Layers,
     ChevronRight, Activity, Cpu, Globe, Star, Volume2,
      Mic, Target, Lightbulb, 
-      Network, Shield, Rocket, Wand2 ,MicOff } from 'lucide-react';
+      Network, Shield, Rocket, Wand2 ,MicOff, 
+      Maximize2,
+      Filter} from 'lucide-react';
 
 
 // Chrome extension type declarations
@@ -866,93 +868,42 @@ function App() {
             </div>
           </div>
 
-           <div className="space-y-3">
-          <h2 className="text-sm font-bold text-white flex items-center space-x-2">
-            <Search className="w-4 h-4 text-blue-400 animate-pulse" />
-            <span>Search Query</span>
-            <div className="flex-1 h-px bg-gradient-to-r from-blue-400/60 via-purple-400/40 to-transparent"></div>
-            <Wand2 className="w-3 h-3 text-purple-400" />
-          </h2>
-          
-          <div className="relative group">
-            <div className="absolute -inset-0.5 bg-gradient-to-r from-blue-500/30 via-purple-500/30 to-pink-500/30 rounded-xl blur opacity-0 group-hover:opacity-100 transition-all duration-500"></div>
-            <div className="absolute inset-0 bg-gradient-to-r from-blue-500/10 to-purple-500/10 rounded-lg opacity-0 group-focus-within:opacity-100 transition-opacity duration-500"></div>
+
+
+<div className="space-y-3">
+            <h2 className="text-sm font-bold text-white flex items-center space-x-2">
+              <Filter className="w-4 h-4 text-cyan-400 animate-pulse" />
+              <span>Quick Actions</span>
+              <div className="flex-1 h-px bg-gradient-to-r from-cyan-400/60 via-blue-400/40 to-transparent"></div>
+            </h2>
             
-            <input
-              type="text"
-              value={searchKeyword}
-              onChange={handleSearchKeywordChange}
-              placeholder={isListening ? "Listening..." : "What to search in video..."}
-              className="relative w-full px-3 py-2 pl-10 pr-20 bg-gradient-to-r from-white/15 to-white/10 backdrop-blur-2xl 
-                border border-white/30 rounded-xl focus:outline-none focus:ring-1 focus:ring-blue-500/60 
-                focus:border-blue-400/60 placeholder-gray-400 text-white transition-all duration-500 
-                hover:bg-white/20 hover:border-white/40 text-sm font-medium shadow-lg hover:shadow-blue-500/20
-                focus:shadow-lg focus:shadow-purple-500/30"
-            />
-            
-            <div className="absolute left-3 top-1/2 transform -translate-y-1/2">
-              <Search className="w-4 h-4 text-gray-400 group-hover:text-blue-400 group-focus-within:text-purple-400 transition-colors duration-500" />
-            </div>
-            
-            <div className="absolute right-3 top-1/2 transform -translate-y-1/2 flex items-center space-x-2">
-              {/* Voice Search Button */}
-              <button
-                onClick={handleVoiceClick}
-                disabled={!isSupported}
-                className={`p-1.5 rounded-full transition-all duration-300 ${
-                  isListening
-                    ? 'bg-red-500/20 text-red-400 animate-pulse shadow-lg shadow-red-500/30'
-                    : isSupported
-                    ? 'bg-green-500/20 text-green-400 hover:bg-green-500/30 hover:scale-110 shadow-lg hover:shadow-green-500/30'
-                    : 'bg-gray-500/20 text-gray-500 cursor-not-allowed'
-                }`}
-                title={isListening ? "Stop listening" : "Start voice search"}
-              >
-                {isListening ? (
-                  <div className="relative">
-                    <MicOff className="w-4 h-4" />
-                    <div className="absolute -inset-1 border-2 border-red-400 rounded-full animate-ping"></div>
-                  </div>
-                ) : (
-                  <Mic className="w-4 h-4" />
-                )}
+            <div className="grid grid-cols-2 gap-2">
+              <button className="group relative p-2 bg-gradient-to-br from-white/10 to-white/5 backdrop-blur-2xl 
+                border border-white/20 rounded-lg hover:border-white/40 transition-all duration-500 
+                hover:scale-105 hover:shadow-md hover:shadow-cyan-500/20 overflow-hidden text-xs">
+                <div className="absolute inset-0 bg-gradient-to-br from-cyan-500/10 to-blue-500/10 opacity-0 group-hover:opacity-100 transition-opacity duration-500"></div>
+                <div className="relative flex items-center space-x-1">
+                  <Mic className="w-3 h-3 text-cyan-400 group-hover:animate-pulse" />
+                  <span className="font-medium text-white">Voice</span>
+                </div>
               </button>
               
-              <div className="w-px h-4 bg-gradient-to-t from-purple-400/50 to-transparent"></div>
-              
-              <div className="flex items-center space-x-1">
-                <Cpu className="w-4 h-4 text-purple-400 animate-pulse" />
-                <div className="w-0.5 h-4 bg-gradient-to-t from-purple-400 to-transparent rounded-full animate-pulse"></div>
-              </div>
+              <button className="group relative p-2 bg-gradient-to-br from-white/10 to-white/5 backdrop-blur-2xl 
+                border border-white/20 rounded-lg hover:border-white/40 transition-all duration-500 
+                hover:scale-105 hover:shadow-md hover:shadow-purple-500/20 overflow-hidden text-xs">
+                <div className="absolute inset-0 bg-gradient-to-br from-purple-500/10 to-pink-500/10 opacity-0 group-hover:opacity-100 transition-opacity duration-500"></div>
+                <div className="relative flex items-center space-x-1">
+                  <Maximize2 className="w-3 h-3 text-purple-400 group-hover:animate-pulse" />
+                  <span className="font-medium text-white">Full Screen</span>
+                </div>
+              </button>
             </div>
           </div>
+
+
+
+
           
-          {/* Voice Status Indicator */}
-          {isListening && (
-            <div className="flex items-center justify-center space-x-2 text-sm text-green-400">
-              <Volume2 className="w-4 h-4 animate-pulse" />
-              <span>Listening... {transcript && `"${transcript}"`}</span>
-              <div className="flex space-x-1">
-                <div className="w-1 h-1 bg-green-400 rounded-full animate-bounce" style={{ animationDelay: '0ms' }}></div>
-                <div className="w-1 h-1 bg-green-400 rounded-full animate-bounce" style={{ animationDelay: '150ms' }}></div>
-                <div className="w-1 h-1 bg-green-400 rounded-full animate-bounce" style={{ animationDelay: '300ms' }}></div>
-              </div>
-            </div>
-          )}
-          
-          {/* Browser Support and Instructions */}
-          {!isSupported && (
-            <div className="text-xs text-amber-400 text-center bg-amber-500/10 border border-amber-500/20 rounded-lg p-2">
-              Voice search requires Chrome, Edge, or Safari browser
-            </div>
-          )}
-          
-          {isSupported && (
-            <div className="text-xs text-blue-300/70 text-center">
-              Click the microphone icon and allow microphone access to use voice search
-            </div>
-          )}
-        </div>
         </div>
 
         <div className="relative p-4 pt-2 bg-gradient-to-t from-black/50 to-transparent backdrop-blur-xl border-t border-white/10 flex-shrink-0">
