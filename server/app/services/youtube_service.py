@@ -62,7 +62,8 @@ class MongoDBEmbeddingSaver:
         """Save optimized video embeddings to MongoDB (segments only)"""
         try:
             saved_documents = []
-
+            # Add this method to your MongoDBEmbeddingSaver class
+            
             # Save individual caption segments only
             if processed_video.caption_segments:
                 segment_docs = []
@@ -110,69 +111,97 @@ class MongoDBEmbeddingSaver:
                 "error": str(e),
                 "saved_documents": saved_documents,
             }
-
-    async def search_similar_content(self, query_text: str, limit: int = 3) -> List[Dict]:
-        """Search for similar content and return top segments with timestamps"""
-        try:
-            # Get embedding vector for the query text
-            query_vector = self.embedding_service.embed_query(query_text)
-
-            # Use $vectorSearch aggregation pipeline
-            pipeline = [
-                {
-                    "$vectorSearch": {
-                        "index": ATLAS_VECTOR_SEARCH_INDEX_NAME,
-                        "path": "embedding",
-                        "queryVector": query_vector,
-                        "numCandidates": 30,
-                        "limit": limit
-                    }
-                },
-                {
-                    "$project": {
-                        "_id": 0,
-                        "content": "$text_content",
-                        "video_id": "$video_id",
-                        "title": "$title",
-                        "author": "$author",
-                        "start_time": "$start_time",
-                        "end_time": "$end_time",
-                        "duration": "$duration",
-                        "is_merged": "$is_merged",
-                        "merged_count": "$merged_count",
-                        "similarity_score": {"$meta": "vectorSearchScore"}
+    async def search_similar_content(self, query_text: str, limit: int = 3, min_similarity_score: float = 0.7) -> List[Dict]:
+        
+           query_vector = self.embedding_service.embed_query(query_text)
+           num_candidates = min(limit * 10, 100)
+        
+           pipeline = [
+            {
+                "$vectorSearch": {
+                    "index": ATLAS_VECTOR_SEARCH_INDEX_NAME,
+                    "path": "embedding",
+                    "queryVector": query_vector,
+                    "numCandidates": num_candidates,
+                    "limit": limit * 10  # Get more results for deduplication
+                }
+            },
+            {"$addFields": {"similarity_score": {"$meta": "vectorSearchScore"}}},
+            {"$match": {
+                "similarity_score": {"$gte": min_similarity_score},
+                "timestamp_validated": {"$ne": False}
+            }},
+            # Add deduplication key
+            {
+                "$addFields": {
+                    "dedup_key": {
+                        "$concat": [
+                            "$video_id",
+                            "_",
+                            {"$toString": "$start_time"},
+                            "_",
+                            {"$toString": "$end_time"}
+                        ]
                     }
                 }
-            ]
+            },
+            # Group by deduplication key and keep the highest scoring document
+            {
+                "$group": {
+                    "_id": "$dedup_key",
+                    "doc": {"$first": "$$ROOT"},
+                    "max_score": {"$max": "$similarity_score"}
+                }
+            },
+            # Replace root with the document
+            {"$replaceRoot": {"newRoot": "$doc"}},
+            {"$sort": {"similarity_score": -1}},
+            {"$limit": limit},
+            {
+                "$project": {
+                    "_id": 0,
+                    "content": "$text_content",
+                    "video_id": "$video_id",
+                    "title": "$title",
+                    "author": "$author",
+                    "start_time": "$start_time",
+                    "end_time": "$end_time",
+                    "duration": "$duration",
+                    "is_merged": "$is_merged",
+                    "merged_count": "$merged_count",
+                    "original_segments": "$original_segments",
+                    "similarity_score": 1,
+                    "timestamp_validated": "$timestamp_validated"
+                }
+            }
+        ]
+        
+           results = list(self.collection.aggregate(pipeline))
+           print(f"🔍 Found {len(results)} unique segments for query '{query_text}'")
+        
+        # Format results with timestamps
+           formatted_results = []
+           for result in results:
+              start_time = result.get("start_time", 0)
+              end_time = result.get("end_time", 0)
+              formatted_results.append({
+                "content": result.get("content", ""),
+                "video_id": result.get("video_id", ""),
+                "title": result.get("title", ""),
+                "author": result.get("author", ""),
+                "start_timestamp": self._seconds_to_timestamp(start_time),
+                "end_timestamp": self._seconds_to_timestamp(end_time),
+                "start_time": start_time,
+                "end_time": end_time,
+                "duration": result.get("duration", 0),
+                "is_merged": result.get("is_merged", False),
+                "merged_count": result.get("merged_count", 1),
+                "similarity_score": result.get("similarity_score", 0)
+            })
 
-            results = list(self.collection.aggregate(pipeline))
-            print(f"🔍 Found {results} similar segments for query '{query_text}'")
-            # Format results with timestamps
-            formatted_results = []
-            for result in results:
-                start_time = result.get("start_time", 0)
-                end_time = result.get("end_time", 0)
-                formatted_results.append({
-                    "content": result.get("content", ""),
-                    "video_id": result.get("video_id", ""),
-                    "title": result.get("title", ""),
-                    "author": result.get("author", ""),
-                    "start_timestamp": self._seconds_to_timestamp(start_time),
-                    "end_timestamp": self._seconds_to_timestamp(end_time),
-                    "start_time": start_time,
-                    "end_time": end_time,
-                    "duration": result.get("duration", 0),
-                    "is_merged": result.get("is_merged", False),
-                    "merged_count": result.get("merged_count", 1),
-                    "similarity_score": result.get("similarity_score", 0)
-                })
+           return formatted_results
 
-            return formatted_results
-
-        except Exception as e:
-            logger.error(f"Error performing vector search: {e}")
-            return []
-
+    
     def _seconds_to_timestamp(self, seconds: float) -> str:
         """Convert seconds to readable timestamp (MM:SS or HH:MM:SS)"""
         hours = int(seconds // 3600)
@@ -389,77 +418,58 @@ class YouTubeVideoService:
             return {"success": False, "error": str(e)}
 
     def merge_similar_segments(self, segments_with_embeddings: List[Tuple[Dict, List[float]]]) -> List[CaptionSegment]:
-        """Merge segments based on cosine similarity threshold"""
-        if not segments_with_embeddings:
-            return []
-
-        # Extract embeddings for similarity calculation
-        embeddings = np.array([emb for _, emb in segments_with_embeddings])
-        segments = [seg for seg, _ in segments_with_embeddings]
+      if not segments_with_embeddings:
+        return []
+    
+      merged_segments = []
+      i = 0
+    
+      while i < len(segments_with_embeddings):
+        current_seg, current_emb = segments_with_embeddings[i]
+        merged_indices = [i]
         
-        # Calculate cosine similarity matrix
-        similarity_matrix = cosine_similarity(embeddings)
-        
-        merged_segments = []
-        used_indices = set()
-        
-        print(f"🔄 Analyzing {len(segments)} segments for similarity merging (threshold: {self.similarity_threshold})")
-        
-        for i in range(len(segments)):
-            if i in used_indices:
-                continue
-                
-            # Find similar segments
-            similar_indices = []
-            for j in range(i, len(segments)):
-                if j not in used_indices and similarity_matrix[i][j] >= self.similarity_threshold:
-                    similar_indices.append(j)
+        # Check consecutive neighbors
+        j = i + 1
+        while j < len(segments_with_embeddings):
+            next_seg, next_emb = segments_with_embeddings[j]
+            similarity = cosine_similarity([current_emb], [next_emb])[0][0]
             
-            if len(similar_indices) > 1:
-                # Merge similar segments
-                merged_text = " ".join(segments[idx]["text"] for idx in similar_indices)
-                start_time = min(segments[idx]["start"] for idx in similar_indices)
-                end_times = [segments[idx]["start"] + segments[idx]["duration"] for idx in similar_indices]
-                end_time = max(end_times)
-                duration = end_time - start_time
-                
-                # Use the embedding of the first segment (representative)
-                merged_embedding = segments_with_embeddings[i][1]
-                
-                merged_segment = CaptionSegment(
-                    text=merged_text,
-                    start_time=start_time,
-                    end_time=end_time,
-                    duration=duration,
-                    embedding=merged_embedding,
-                    is_merged=True,
-                    merged_count=len(similar_indices)
-                )
-                
-                merged_segments.append(merged_segment)
-                used_indices.update(similar_indices)
-                
-                print(f"🔗 Merged {len(similar_indices)} segments (similarity: {similarity_matrix[i][similar_indices[1]]:.3f})")
-                
+            if similarity >= self.similarity_threshold:
+                merged_indices.append(j)
+                j += 1
             else:
-                # Keep individual segment
-                seg = segments[i]
-                individual_segment = CaptionSegment(
-                    text=seg["text"],
-                    start_time=seg["start"],
-                    end_time=seg["start"] + seg["duration"],
-                    duration=seg["duration"],
-                    embedding=segments_with_embeddings[i][1],
-                    is_merged=False,
-                    merged_count=1
-                )
-                
-                merged_segments.append(individual_segment)
-                used_indices.add(i)
+                break
         
-        print(f"✅ Merged {len(segments)} segments into {len(merged_segments)} final segments")
-        return merged_segments
-
+        # Create merged segment
+        if len(merged_indices) > 1:
+            texts = [segments_with_embeddings[idx][0]["text"] for idx in merged_indices]
+            starts = [segments_with_embeddings[idx][0]["start"] for idx in merged_indices]
+            durations = [segments_with_embeddings[idx][0]["duration"] for idx in merged_indices]
+            
+            merged_segment = CaptionSegment(
+                text=" ".join(texts),
+                start_time=min(starts),
+                end_time=starts[-1] + durations[-1],
+                duration=starts[-1] + durations[-1] - min(starts),
+                embedding=current_emb,
+                is_merged=True,
+                merged_count=len(merged_indices)
+            )
+        else:
+            merged_segment = CaptionSegment(
+                text=current_seg["text"],
+                start_time=current_seg["start"],
+                end_time=current_seg["start"] + current_seg["duration"],
+                duration=current_seg["duration"],
+                embedding=current_emb,
+                is_merged=False,
+                merged_count=1
+            )
+        
+        merged_segments.append(merged_segment)
+        i = merged_indices[-1] + 1
+    
+      return merged_segments
     async def process_video_with_embeddings(
         self,
         url: str,
@@ -533,8 +543,9 @@ class YouTubeVideoService:
 
     async def search_videos(self, query: str, limit: int = 3) -> List[Dict]:
         """Search for similar videos and return top segments with timestamps"""
+        # // await self.mongo_saver.remove_duplicate_segments()
         return await self.mongo_saver.search_similar_content(query, limit)
-
+        
     def display_segments_summary(self, processed_video: ProcessedVideo, max_segments: int = 5):
         """Display summary of processed segments"""
         print(f"\n📊 PROCESSED SEGMENTS SUMMARY")
