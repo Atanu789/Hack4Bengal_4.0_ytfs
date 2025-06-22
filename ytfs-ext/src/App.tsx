@@ -4,7 +4,7 @@ import { Clock,Search, Brain, FileText, Settings, Zap, RefreshCw, Play, Sparkles
 // Chrome extension type declarations
 declare global {
   interface Window {
-    chrome?: any;
+  
     SpeechRecognition: typeof SpeechRecognition;
     webkitSpeechRecognition: typeof SpeechRecognition;
     webkitAudioContext: typeof AudioContext;
@@ -258,6 +258,30 @@ useEffect(() => {
     }
   }
 }, []);
+ const searchAutoVideos = async (videoUrl: string, searchQuery: string,limit:number=5) => {
+    try {
+      const response = await fetch('http://localhost:8000/youtube/video/suggestion', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          url: videoUrl,
+          query: searchQuery,
+          limit
+        }),
+      });
+
+      if (!response.ok) {
+        throw new Error(`API request failed with status ${response.status}`);
+      }
+
+      return await response.json();
+    } catch (error) {
+      console.error('Error searching video:', error);
+      throw error;
+    }
+  };
   const searchVideo = async (videoUrl: string, searchQuery: string) => {
     try {
       const response = await fetch('http://localhost:8000/youtube/video/search', {
@@ -304,6 +328,18 @@ useEffect(() => {
   if (activeSearchTypes.length === 0) {
     alert('Please select at least one search method!');
     return;
+  }
+  if(suggestion && semanticSearch){
+    try {
+    const results = await searchAutoVideos(videoLink, searchKeyword, 3);
+    console.log('Auto-suggest results:', results);
+    // Handle both current video results and similar videos
+    setSearchResults(results.current_video_results || []);
+    // You might want to do something with results.similar_videos too
+  } catch (error) {
+    console.error('Auto-suggest error:', error);
+  }
+
   }
 
   setIsSearching(true);
