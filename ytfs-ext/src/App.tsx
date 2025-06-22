@@ -654,10 +654,10 @@ useEffect(() => {
                       )}
                     </div>
                     <div className={`absolute inset-0 rounded-full animate-ping opacity-30 ${
-                      isVideoDetected ? 'bg-emerald-400' : 'bg-red-400'
+                      isVideoDetected ? 'bg-emerald-600' : 'bg-red-600'
                     }`}></div>
                     <div className={`absolute -inset-0.5 rounded-full animate-ping opacity-20 ${
-                      isVideoDetected ? 'bg-emerald-400' : 'bg-red-400'
+                      isVideoDetected ? 'bg-emerald-600' : 'bg-red-600'
                     }`} style={{animationDelay: '0.5s'}}></div>
                   </div>
                   <div className="flex-1 space-y-0.5">
@@ -804,7 +804,7 @@ useEffect(() => {
               />
               
               <SearchMethodCard
-                icon={FileText}
+                icon={Lightbulb}
                 title="Suggestion"
                 description="Get related content suggestions"
                 active={suggestion}
@@ -848,6 +848,7 @@ useEffect(() => {
                 </div>
                 
                 <div className="grid grid-cols-2 gap-2">
+
                   {semanticSearch && (
                     <div className="group relative px-2 py-1.5 bg-gradient-to-r from-purple-500/30 via-violet-500/25 to-pink-500/30 
                       text-purple-100 text-xs rounded-lg border border-purple-400/40 
@@ -879,6 +880,7 @@ useEffect(() => {
                     </div>
                   )}
                 </div>
+
                 
                 <div className="flex items-center justify-between pt-1 border-t border-white/20 text-xs">
                   <div className="flex items-center space-x-1 text-gray-300">
@@ -893,6 +895,8 @@ useEffect(() => {
               </div>
             </div>
           )}
+
+
 
           {/* AI Insights Section */}
           <div className="space-y-3">
@@ -942,6 +946,7 @@ useEffect(() => {
               </div>
             </div>
           </div>
+
 
           {/* Quick Actions Section */}
           <div className="space-y-3">
